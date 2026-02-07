@@ -1,6 +1,10 @@
 package ui
 
-import "fmt"
+import (
+	_ "embed"
+	"fmt"
+	"strings"
+)
 
 type SplashData struct {
 	BaseDir    string
@@ -8,15 +12,10 @@ type SplashData struct {
 	ActivePack string
 	ConfigPath string
 	ConfigUsed bool
-	Ascii      string
 }
 
 func PrintSplash(d SplashData) {
-	if d.Ascii != "" {
-		fmt.Println(d.Ascii)
-	} else {
-		fmt.Println("dm")
-	}
+	fmt.Println(strings.TrimRight(logoText, "\n"))
 	fmt.Println("dm - Demtrodev CLI")
 	fmt.Println()
 	fmt.Println("Project Info")
@@ -41,3 +40,6 @@ func PrintSplash(d SplashData) {
 	fmt.Println("dm pack use <name>")
 	fmt.Println("dm tools")
 }
+
+//go:embed logo.txt
+var logoText string

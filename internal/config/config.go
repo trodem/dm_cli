@@ -185,6 +185,9 @@ func collectSources(configPath string, include []string, baseDir string) (map[st
 func addSource(sources map[string]int64, path string) error {
 	info, err := os.Stat(path)
 	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
 		return err
 	}
 	sources[path] = info.ModTime().UnixNano()
