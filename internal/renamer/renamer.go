@@ -6,6 +6,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 )
 
@@ -20,6 +21,8 @@ type Options struct {
 	From      string
 	To        string
 	Recursive bool
+	UseRegex  bool
+	CaseSensitive bool
 }
 
 func RunInteractive(baseDir string) int {
@@ -29,9 +32,9 @@ func RunInteractive(baseDir string) int {
 	if basePath == "" {
 		basePath = baseDir
 	}
-	namePart := prompt(reader, "Name contains", "")
+	namePart := prompt(reader, "Name contains (optional)", "")
 	from := prompt(reader, "Replace from", "")
-	to := prompt(reader, "Replace to", "")
+	to := prompt(reader, "Replace to (empty = delete)", "")
 
 	if strings.TrimSpace(from) == "" {
 		fmt.Println("Error: replace-from is required.")
@@ -44,6 +47,8 @@ func RunInteractive(baseDir string) int {
 		From:      from,
 		To:        to,
 		Recursive: true,
+		UseRegex:  true,
+		CaseSensitive: false,
 	})
 	if err != nil {
 		fmt.Println("Error:", err)
@@ -79,9 +84,33 @@ func BuildPlan(opts Options) ([]PlanItem, error) {
 	if base == "" {
 		base = "."
 	}
-	namePart := strings.ToLower(strings.TrimSpace(opts.NamePart))
+	namePart := strings.TrimSpace(opts.NamePart)
 	from := opts.From
 	to := opts.To
+
+	var nameRe *regexp.Regexp
+	var fromRe *regexp.Regexp
+	var err error
+	if opts.UseRegex {
+		namePattern := namePart
+		fromPattern := from
+		if namePattern != "" {
+			namePattern = "(?i)" + namePattern
+		}
+		if !opts.CaseSensitive {
+			fromPattern = "(?i)" + fromPattern
+		}
+		if namePattern != "" {
+			nameRe, err = regexp.Compile(namePattern)
+			if err != nil {
+				return nil, fmt.Errorf("invalid name regex: %w", err)
+			}
+		}
+		fromRe, err = regexp.Compile(fromPattern)
+		if err != nil {
+			return nil, fmt.Errorf("invalid replace regex: %w", err)
+		}
+	}
 
 	var plan []PlanItem
 	walk := func(path string, d fs.DirEntry, err error) error {
@@ -96,14 +125,38 @@ func BuildPlan(opts Options) ([]PlanItem, error) {
 		}
 
 		name := d.Name()
-		if namePart != "" && !strings.Contains(strings.ToLower(name), namePart) {
+		if opts.UseRegex {
+			if nameRe != nil && !nameRe.MatchString(name) {
+				return nil
+			}
+			if !fromRe.MatchString(name) {
+				return nil
+			}
+			newName := fromRe.ReplaceAllString(name, to)
+			if newName == name {
+				return nil
+			}
+			newPath := filepath.Join(filepath.Dir(path), newName)
+			plan = append(plan, PlanItem{OldPath: path, NewPath: newPath})
 			return nil
 		}
 
-		if !strings.Contains(name, from) {
+		if namePart != "" && !strings.Contains(strings.ToLower(name), strings.ToLower(namePart)) {
 			return nil
 		}
-		newName := strings.ReplaceAll(name, from, to)
+		if opts.CaseSensitive {
+			if !strings.Contains(name, from) {
+				return nil
+			}
+			newName := strings.ReplaceAll(name, from, to)
+			if newName == name {
+				return nil
+			}
+			newPath := filepath.Join(filepath.Dir(path), newName)
+			plan = append(plan, PlanItem{OldPath: path, NewPath: newPath})
+			return nil
+		}
+		newName := replaceInsensitive(name, from, to)
 		if newName == name {
 			return nil
 		}
@@ -164,4 +217,15 @@ func dedupe(items []PlanItem) []PlanItem {
 		out = append(out, it)
 	}
 	return out
+}
+
+func replaceInsensitive(s, from, to string) string {
+	if from == "" {
+		return s
+	}
+	re, err := regexp.Compile("(?i)" + regexp.QuoteMeta(from))
+	if err != nil {
+		return s
+	}
+	return re.ReplaceAllString(s, to)
 }

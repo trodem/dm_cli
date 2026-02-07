@@ -7,7 +7,7 @@ import (
 	"cli/internal/filesearch"
 )
 
-func RunFileSearch(baseDir string, r *bufio.Reader) int {
+func RunSearch(baseDir string, r *bufio.Reader) int {
 	base := prompt(r, "Base path", baseDir)
 	name := prompt(r, "Name contains", "")
 	ext := prompt(r, "Extension (optional)", "")

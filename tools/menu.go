@@ -10,23 +10,24 @@ import (
 func RunMenu(baseDir string) int {
 	reader := bufio.NewReader(os.Stdin)
 
-	fmt.Println("\nTools:")
-	fmt.Println("  1) File search")
-	fmt.Println("  2) Rename files")
-	fmt.Println("  0) Cancel")
-	fmt.Print("\n> ")
+	for {
+		fmt.Println("\nTools:")
+		fmt.Println("  1) Search files")
+		fmt.Println("  2) Rename files")
+		fmt.Println("  0) Exit")
+		fmt.Print("\n> ")
 
-	choice := readLine(reader)
-	switch choice {
-	case "1":
-		return RunFileSearch(baseDir, reader)
-	case "2":
-		return RunRename(baseDir, reader)
-	case "0", "":
-		return 0
-	default:
-		fmt.Println("Invalid choice.")
-		return 0
+		choice := readLine(reader)
+		switch choice {
+		case "1":
+			_ = RunSearch(baseDir, reader)
+		case "2":
+			_ = RunRename(baseDir, reader)
+		case "0", "exit", "Exit", "":
+			return 0
+		default:
+			fmt.Println("Invalid choice.")
+		}
 	}
 }
 

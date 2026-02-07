@@ -69,16 +69,18 @@ func PrintToolsHelp() {
 dm tools
 
 Menu:
-  1) File search
+  1) Search files
   2) Rename files
 
-File search:
+Search files:
 - Recursive search by name contains or extension.
 - Sort by name/date/size.
 
 Rename files:
 - Interactive batch rename with preview and confirmation.
-- Match is contains (not exact).
+- Simple text (contains + replace).
+- Name filter is case-insensitive.
+- Replace is case-insensitive by default; prompt allows case-sensitive.
 
 Examples:
   dm tools
