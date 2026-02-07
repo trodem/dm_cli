@@ -1,0 +1,12 @@
+{
+  "paths": {
+    "git-alias": "C:/Program Files/Git/etc/profile.d",
+    "dev": "E:/SynologyDrive/",
+    "knowledge": "E:/SynologyDrive/5_Demtrodev_Knowledge"
+  },
+  "commands": {
+    "docker-clean": "docker system prune -af",
+    "git-sync": "git pull --rebase",
+    "gs": "git status"
+  }
+}

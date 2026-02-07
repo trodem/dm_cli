@@ -1,0 +1,14 @@
+{
+  "jump": {},
+  "run": {
+    "vim": "vim",
+    "nvim": "nvim",
+    "vimtutor": "vimtutor",
+    "vim-version": "vim --version",
+    "nvim-version": "nvim --version"
+  },
+  "projects": {},
+  "search": {
+    "knowledge": "packs/vim/knowledge"
+  }
+}

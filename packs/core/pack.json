@@ -1,0 +1,25 @@
+{
+    "jump":  {
+                 "dev":  "E:/SynologyDrive/dev",
+                 "nas":  "\\\\nas\\data",
+                 "api":  "E:/projects/api"
+             },
+    "run":  {
+                "docker-clean":  "docker system prune -af",
+                "gs":  "git status",
+                "gp":  "git pull"
+            },
+    "projects":  {
+                     "api":  {
+                                 "path":  "E:/projects/api",
+                                 "commands":  {
+                                                  "up":  "docker compose up -d",
+                                                  "logs":  "docker compose logs -f",
+                                                  "down":  "docker compose down"
+                                              }
+                             }
+                 },
+    "search":  {
+                   "knowledge":  "packs/core/knowledge"
+               }
+}

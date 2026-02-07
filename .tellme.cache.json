@@ -1,0 +1,24 @@
+{
+  "sources": {
+    "E:\\SynologyDrive\\5_Demtrodev_Knowledge\\packs\\vim\\pack.json": 1770470740656889300,
+    "E:\\SynologyDrive\\5_Demtrodev_Knowledge\\tellme.json": 1770470106029539000
+  },
+  "config": {
+    "jump": {},
+    "run": {
+      "nvim": "nvim",
+      "nvim-version": "nvim --version",
+      "vim": "vim",
+      "vim-version": "vim --version",
+      "vimtutor": "vimtutor"
+    },
+    "projects": {},
+    "search": {
+      "knowledge": "packs/vim/knowledge"
+    },
+    "include": [
+      "packs\\vim\\pack.json"
+    ],
+    "profiles": null
+  }
+}
