@@ -10,11 +10,12 @@
     "gbr": "git branch",
     "gcl": "git clone",
     "gst": "git stash",
-    "gsta": "git stash apply"
+    "gsta": "git stash apply",
+    "gcommit": "git add . && git commit"
   },
   "projects": {
     "git-tools": {
-      "path": "E:/projects/git-tools",
+      "path": "projects/git-tools",
       "commands": {
         "status": "git status",
         "sync": "git fetch --all --prune",

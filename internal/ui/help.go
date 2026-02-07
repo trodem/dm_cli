@@ -11,25 +11,25 @@ import (
 func PrintHelp(cfg config.Config) {
 	_ = cfg
 	fmt.Println(`
-tellme - personal CLI
+dm - personal CLI
 
 Comandi:
-  tellme <name>                 menu interattivo (jump/project)
-  tellme <project> <action>     esegue comando di progetto
-  tellme run <alias>            esegue alias run
-  tellme find <query>           cerca nei markdown knowledge
-  tellme list <type>            elenca jumps/runs/projects/actions
-  tellme add <type>             aggiunge jump/run/project/action
-  tellme pack new <name>        crea un nuovo pack
-  tellme pack list              elenca i pack
-  tellme pack info <name>       mostra info pack
-  tellme pack use <name>        imposta pack attivo
-  tellme pack current           mostra pack attivo
-  tellme pack unset             rimuove pack attivo
-  tellme validate               valida configurazione
-  tellme plugin <cmd>           gestisce plugins
-  tellme aliases                mostra config in modo leggibile
-  tellme help                   aiuto
+  dm <name>                 menu interattivo (jump/project)
+  dm <project> <action>     esegue comando di progetto
+  dm run <alias>            esegue alias run
+  dm find <query>           cerca nei markdown knowledge
+  dm list <type>            elenca jumps/runs/projects/actions
+  dm add <type>             aggiunge jump/run/project/action
+  dm pack new <name>        crea un nuovo pack
+  dm pack list              elenca i pack
+  dm pack info <name>       mostra info pack
+  dm pack use <name>        imposta pack attivo
+  dm pack current           mostra pack attivo
+  dm pack unset             rimuove pack attivo
+  dm validate               valida configurazione
+  dm plugin <cmd>           gestisce plugins
+  dm aliases                mostra config in modo leggibile
+  dm help                   aiuto
 
 Flags:
   --profile <name>              usa un profilo specifico
@@ -38,7 +38,7 @@ Flags:
 `)
 
 	fmt.Println("Suggerimento CD (senza modifiche shell):")
-	fmt.Println(`  cd $(tellme <name>  => scegli "Print path")`)
+	fmt.Println(`  cd $(dm <name>  => scegli "Print path")`)
 	fmt.Println()
 }
 

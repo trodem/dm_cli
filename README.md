@@ -1,6 +1,18 @@
-# tellme
+# dm
 
 Small personal CLI to jump to folders, run project commands, and search a knowledge base.
+
+## Index
+- [Features](#features)
+- [Requirements](#requirements)
+- [Build](#build)
+- [Configuration](#configuration)
+- [Usage](#usage)
+- [Project Actions](#project-actions)
+- [Search](#search)
+- [Plugins](#plugins)
+- [Project Layout](#project-layout)
+- [Changelog](#changelog)
 
 ## Features
 - Jump to paths from aliases
@@ -17,11 +29,11 @@ Small personal CLI to jump to folders, run project commands, and search a knowle
 
 ## Build
 ```bash
-go build -o tellme.exe .
+go build -o dm.exe .
 ```
 
 ## Configuration
-`tellme.json` is loaded from the executable directory.
+`dm.json` is loaded from the executable directory.
 
 ### Packs (recommended)
 Each pack is a folder that contains everything for a domain/project:
@@ -30,7 +42,38 @@ packs/<name>/pack.json
 packs/<name>/knowledge/
 ```
 
-Example `tellme.json`:
+### Pack Explained (simple)
+Think of a pack as a box with 4 things:
+
+- `jump`: shortcuts to folders
+- `run`: buttons to run commands
+- `projects`: projects with their commands
+- `search`: where to search notes
+
+Example:
+```json
+{
+  "jump": { "api": "projects/api" },
+  "run": { "gs": "git status" },
+  "projects": {
+    "git-tools": {
+      "path": "projects/git-tools",
+      "commands": { "gcommit": "git add . && git commit" }
+    }
+  },
+  "search": { "knowledge": "packs/git/knowledge" }
+}
+```
+
+Usage:
+```bash
+dm api
+dm run gs
+dm git-tools gcommit
+dm -p git find branch
+```
+
+Example `dm.json`:
 ```json
 {
   "include": ["packs/*/pack.json"]
@@ -77,50 +120,49 @@ Define profile-specific includes and optional search overrides:
 
 Use it with:
 ```bash
-tellme --profile work list jumps
+dm --profile work list jumps
 ```
 
 ### Cache
-`tellme` writes a cache file in the executable directory:
-- `.tellme.cache.json` (default)
-- `.tellme.cache.<profile>.json` (profile)
+`dm` writes a cache file in the executable directory:
+- `.dm.cache.json` (default)
+- `.dm.cache.<profile>.json` (profile)
 
 Disable with:
 ```bash
-tellme --no-cache list jumps
+dm --no-cache list jumps
 ```
 
 ## Usage
 ```bash
-tellme help
-tellme aliases
-tellme --pack docker list jumps
-tellme -p docker list jumps
-tellme list jumps
-tellme add jump <name> <path>
-tellme --pack docker add jump <name> <path>
-tellme pack new <name>
-tellme pack list
-tellme pack info <name>
-tellme pack use <name>
-tellme pack current
-tellme pack unset
-tellme validate
-tellme plugin list
-tellme plugin run <name> [args...]
-tellme run <alias>
-tellme find <query>
-tellme <project> <action>
-tellme <name>
+dm help
+dm aliases
+dm --pack docker list jumps
+dm -p docker list jumps
+dm list jumps
+dm add jump <name> <path>
+dm --pack docker add jump <name> <path>
+dm pack new <name>
+dm pack list
+dm pack info <name>
+dm pack use <name>
+dm pack current
+dm pack unset
+dm validate
+dm plugin list
+dm plugin run <name> [args...]
+dm run <alias>
+dm find <query>
+dm <project> <action>
+dm <name>
 ```
 
 Notes:
-- If `--pack` is not provided, `tellme add` writes to `packs/core/pack.json`.
-- You can set a default pack with `tellme pack use <name>`.
+- Use `-p <pack>` or set a default pack with `dm pack use <name>`.
 
 Interactive target:
 ```bash
-tellme <name>
+dm <name>
 ```
 `<name>` can be a `jump` alias or a `project` name.
 
@@ -129,13 +171,13 @@ Project actions are defined under `projects.<name>.commands`.
 
 Example:
 ```bash
-tellme app test
+dm app test
 ```
 
 ## Search
 Searches all `.md` files under `search.knowledge`:
 ```bash
-tellme find golang
+dm find golang
 ```
 If `rg` (ripgrep) is installed, it is used automatically for faster search.
 If you use packs, pass `--pack <name>` so search uses that pack knowledge folder.
@@ -147,8 +189,8 @@ Place scripts in `plugins/`:
 
 Run:
 ```bash
-tellme plugin list
-tellme plugin run <name> [args...]
+dm plugin list
+dm plugin run <name> [args...]
 ```
 
 ## Project Layout

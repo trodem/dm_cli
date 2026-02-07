@@ -26,7 +26,7 @@ func ShowMenu(cfg config.Config, name, targetPath, baseDir string) {
 
 	// menu base
 	fmt.Println("Scegli azione:")
-	fmt.Println("  1) Print path (per cd $(tellme ...))")
+	fmt.Println("  1) Print path (per cd $(dm ...))")
 	fmt.Println("  2) Open Explorer/Finder")
 	fmt.Println("  3) Open VS Code (code .)")
 	fmt.Println("  4) Open new terminal here")

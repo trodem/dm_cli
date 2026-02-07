@@ -189,9 +189,9 @@ func addSource(sources map[string]int64, path string) error {
 
 func cacheFilePath(baseDir, profile string) string {
 	if profile == "" {
-		return filepath.Join(baseDir, ".tellme.cache.json")
+		return filepath.Join(baseDir, ".dm.cache.json")
 	}
-	return filepath.Join(baseDir, ".tellme.cache."+profile+".json")
+	return filepath.Join(baseDir, ".dm.cache."+profile+".json")
 }
 
 func loadValidCache(path string, sources map[string]int64) (Config, bool) {

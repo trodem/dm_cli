@@ -12,22 +12,22 @@ func TestLoadWithInclude(t *testing.T) {
 	mainCfg := `{
   "include": ["packs/*/pack.json"]
 }`
-	if err := os.WriteFile(filepath.Join(dir, "tellme.json"), []byte(mainCfg), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "dm.json"), []byte(mainCfg), 0644); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.MkdirAll(filepath.Join(dir, "packs", "core"), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Join(dir, "packs", "base"), 0755); err != nil {
 		t.Fatal(err)
 	}
 	packCfg := `{
   "jump": {"dev": "E:/dev"},
   "run": {"gs": "git status"},
-  "search": { "knowledge": "packs/core/knowledge" }
+  "search": { "knowledge": "packs/base/knowledge" }
 }`
-	if err := os.WriteFile(filepath.Join(dir, "packs", "core", "pack.json"), []byte(packCfg), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "packs", "base", "pack.json"), []byte(packCfg), 0644); err != nil {
 		t.Fatal(err)
 	}
 
-	cfg, err := Load(filepath.Join(dir, "tellme.json"), Options{UseCache: false})
+	cfg, err := Load(filepath.Join(dir, "dm.json"), Options{UseCache: false})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -37,7 +37,7 @@ func TestLoadWithInclude(t *testing.T) {
 	if cfg.Run["gs"] != "git status" {
 		t.Fatalf("expected run gs, got %v", cfg.Run["gs"])
 	}
-	if cfg.Search.Knowledge != "packs/core/knowledge" {
+	if cfg.Search.Knowledge != "packs/base/knowledge" {
 		t.Fatalf("expected knowledge, got %v", cfg.Search.Knowledge)
 	}
 }
@@ -51,17 +51,17 @@ func TestLoadWithProfile(t *testing.T) {
     "work": { "include": ["packs/work/pack.json"] }
   }
 }`
-	if err := os.WriteFile(filepath.Join(dir, "tellme.json"), []byte(mainCfg), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "dm.json"), []byte(mainCfg), 0644); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.MkdirAll(filepath.Join(dir, "packs", "core"), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Join(dir, "packs", "base"), 0755); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.MkdirAll(filepath.Join(dir, "packs", "work"), 0755); err != nil {
 		t.Fatal(err)
 	}
 	defaultCfg := `{"jump": {"home": "C:/home"}}`
-	if err := os.WriteFile(filepath.Join(dir, "packs", "core", "pack.json"), []byte(defaultCfg), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "packs", "base", "pack.json"), []byte(defaultCfg), 0644); err != nil {
 		t.Fatal(err)
 	}
 	workCfg := `{"jump": {"office": "C:/office"}}`
@@ -69,7 +69,7 @@ func TestLoadWithProfile(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	cfg, err := Load(filepath.Join(dir, "tellme.json"), Options{Profile: "work", UseCache: false})
+	cfg, err := Load(filepath.Join(dir, "dm.json"), Options{Profile: "work", UseCache: false})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -85,18 +85,18 @@ func TestCache(t *testing.T) {
 	dir := t.TempDir()
 
 	mainCfg := `{"include": ["packs/*/pack.json"]}`
-	if err := os.WriteFile(filepath.Join(dir, "tellme.json"), []byte(mainCfg), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "dm.json"), []byte(mainCfg), 0644); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.MkdirAll(filepath.Join(dir, "packs", "core"), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Join(dir, "packs", "base"), 0755); err != nil {
 		t.Fatal(err)
 	}
 	jumpCfg := `{"jump": {"dev": "E:/dev"}}`
-	if err := os.WriteFile(filepath.Join(dir, "packs", "core", "pack.json"), []byte(jumpCfg), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "packs", "base", "pack.json"), []byte(jumpCfg), 0644); err != nil {
 		t.Fatal(err)
 	}
 
-	cfg, err := Load(filepath.Join(dir, "tellme.json"), Options{UseCache: true})
+	cfg, err := Load(filepath.Join(dir, "dm.json"), Options{UseCache: true})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -104,7 +104,7 @@ func TestCache(t *testing.T) {
 		t.Fatalf("expected jump dev, got %v", cfg.Jump["dev"])
 	}
 
-	cfg2, err := Load(filepath.Join(dir, "tellme.json"), Options{UseCache: true})
+	cfg2, err := Load(filepath.Join(dir, "dm.json"), Options{UseCache: true})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -117,22 +117,22 @@ func TestPackDefaultKnowledge(t *testing.T) {
 	dir := t.TempDir()
 
 	mainCfg := `{"include": ["packs/*/pack.json"]}`
-	if err := os.WriteFile(filepath.Join(dir, "tellme.json"), []byte(mainCfg), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "dm.json"), []byte(mainCfg), 0644); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.MkdirAll(filepath.Join(dir, "packs", "core"), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Join(dir, "packs", "base"), 0755); err != nil {
 		t.Fatal(err)
 	}
 	packCfg := `{"jump": {"dev": "E:/dev"}}`
-	if err := os.WriteFile(filepath.Join(dir, "packs", "core", "pack.json"), []byte(packCfg), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "packs", "base", "pack.json"), []byte(packCfg), 0644); err != nil {
 		t.Fatal(err)
 	}
 
-	cfg, err := Load(filepath.Join(dir, "tellme.json"), Options{Pack: "core", UseCache: false})
+	cfg, err := Load(filepath.Join(dir, "dm.json"), Options{Pack: "base", UseCache: false})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cfg.Search.Knowledge != filepath.Join("packs", "core", "knowledge") {
+	if cfg.Search.Knowledge != filepath.Join("packs", "base", "knowledge") {
 		t.Fatalf("expected default knowledge, got %v", cfg.Search.Knowledge)
 	}
 }

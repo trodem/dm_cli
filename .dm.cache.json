@@ -1,0 +1,44 @@
+{
+  "sources": {
+    "E:\\SynologyDrive\\5_Demtrodev_Knowledge\\dm.json": 1770470106029539000,
+    "E:\\SynologyDrive\\5_Demtrodev_Knowledge\\packs\\git\\pack.json": 1770474513156435800
+  },
+  "config": {
+    "jump": {},
+    "run": {
+      "gbr": "git branch",
+      "gcl": "git clone",
+      "gco": "git checkout",
+      "gcommit": "git add . \u0026\u0026 git commit",
+      "gl": "git log --oneline --graph --decorate",
+      "gpl": "git pull",
+      "gps": "git push",
+      "gs": "git status",
+      "gss": "git status -s",
+      "gst": "git stash",
+      "gsta": "git stash apply"
+    },
+    "projects": {
+      "git-tools": {
+        "path": "projects/git-tools",
+        "commands": {
+          "authors": "git shortlog -sn",
+          "changelog": "git log --pretty=format:\"%h %ad %s\" --date=short",
+          "graph": "git log --oneline --graph --decorate --all",
+          "last-10": "git log -10 --oneline",
+          "prune-merged": "for /f \"tokens=*\" %i in ('git branch --merged ^| findstr /v /c:\"*\" /c:\"main\" /c:\"master\"') do git branch -d %i",
+          "status": "git status",
+          "sync": "git fetch --all --prune",
+          "tags": "git tag -n"
+        }
+      }
+    },
+    "search": {
+      "knowledge": "packs/git/knowledge"
+    },
+    "include": [
+      "packs\\git\\pack.json"
+    ],
+    "profiles": null
+  }
+}

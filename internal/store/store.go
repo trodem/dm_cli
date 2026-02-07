@@ -108,7 +108,7 @@ func PackExists(baseDir, name string) bool {
 }
 
 func ActivePackPath(baseDir string) string {
-	return filepath.Join(baseDir, ".tellme.active-pack")
+	return filepath.Join(baseDir, ".dm.active-pack")
 }
 
 func GetActivePack(baseDir string) (string, error) {

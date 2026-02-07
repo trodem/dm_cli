@@ -23,7 +23,7 @@ func Run(args []string) int {
 
 	opts, rest := parseFlags(args)
 
-	cfgPath := filepath.Join(baseDir, "tellme.json")
+	cfgPath := filepath.Join(baseDir, "dm.json")
 	if opts.Pack == "" {
 		if active, err := store.GetActivePack(baseDir); err == nil && active != "" {
 			opts.Pack = active
@@ -35,7 +35,7 @@ func Run(args []string) int {
 		Pack:     opts.Pack,
 	})
 	if err != nil {
-		fmt.Println("Errore caricando tellme.json:", err)
+		fmt.Println("Errore caricando dm.json:", err)
 		return 1
 	}
 
@@ -66,7 +66,7 @@ func Run(args []string) int {
 		return runPlugin(baseDir, args[1:])
 	case "find", "search":
 		if len(args) < 2 {
-			fmt.Println("Uso: tellme find <query>")
+			fmt.Println("Uso: dm find <query>")
 			return 0
 		}
 		knowledgeDir := config.ResolvePath(baseDir, cfg.Search.Knowledge)
@@ -75,7 +75,7 @@ func Run(args []string) int {
 		return 0
 	case "run":
 		if len(args) < 2 {
-			fmt.Println("Uso: tellme run <alias>")
+			fmt.Println("Uso: dm run <alias>")
 			return 0
 		}
 		name := args[1]
@@ -83,14 +83,14 @@ func Run(args []string) int {
 		return 0
 	}
 
-	// PROJECT MODE: tellme <project> <action>
+	// PROJECT MODE: dm <project> <action>
 	if _, ok := cfg.Projects[args[0]]; ok && len(args) >= 2 {
 		action := args[1]
 		runner.RunProjectCommand(cfg, args[0], action, baseDir)
 		return 0
 	}
 
-	// INTERACTIVE TARGET: tellme <name>
+	// INTERACTIVE TARGET: dm <name>
 	name := args[0]
 
 	// target puo' essere jump o project
@@ -178,7 +178,7 @@ func runValidate(cfg config.Config) int {
 
 func runList(cfg config.Config, args []string) int {
 	if len(args) == 0 {
-		fmt.Println("Uso: tellme list <jumps|runs|projects|actions>")
+		fmt.Println("Uso: dm list <jumps|runs|projects|actions>")
 		return 0
 	}
 	switch args[0] {
@@ -190,7 +190,7 @@ func runList(cfg config.Config, args []string) int {
 		ui.PrintProjects(cfg.Projects)
 	case "actions":
 		if len(args) < 2 {
-			fmt.Println("Uso: tellme list actions <project>")
+			fmt.Println("Uso: dm list actions <project>")
 			return 0
 		}
 		p, ok := cfg.Projects[args[1]]
@@ -200,24 +200,25 @@ func runList(cfg config.Config, args []string) int {
 		}
 		ui.PrintMap(p.Commands)
 	default:
-		fmt.Println("Uso: tellme list <jumps|runs|projects|actions>")
+		fmt.Println("Uso: dm list <jumps|runs|projects|actions>")
 	}
 	return 0
 }
 
 func runAdd(baseDir string, opts flags, args []string) int {
 	if len(args) < 1 {
-		fmt.Println("Uso: tellme add <jump|run|project|action> ...")
+		fmt.Println("Uso: dm add <jump|run|project|action> ...")
 		return 0
 	}
 	pack := opts.Pack
 	if pack == "" {
-		pack = "core"
+		fmt.Println("Errore: nessun pack attivo. Usa -p <pack> o dm pack use <name>.")
+		return 1
 	}
 	switch args[0] {
 	case "jump":
 		if len(args) < 3 {
-			fmt.Println("Uso: tellme add jump <name> <path>")
+			fmt.Println("Uso: dm add jump <name> <path>")
 			return 0
 		}
 		path := filepath.Join(baseDir, "packs", pack, "pack.json")
@@ -235,7 +236,7 @@ func runAdd(baseDir string, opts flags, args []string) int {
 		return 0
 	case "run":
 		if len(args) < 3 {
-			fmt.Println("Uso: tellme add run <name> <command>")
+			fmt.Println("Uso: dm add run <name> <command>")
 			return 0
 		}
 		path := filepath.Join(baseDir, "packs", pack, "pack.json")
@@ -253,7 +254,7 @@ func runAdd(baseDir string, opts flags, args []string) int {
 		return 0
 	case "project":
 		if len(args) < 3 {
-			fmt.Println("Uso: tellme add project <name> <path>")
+			fmt.Println("Uso: dm add project <name> <path>")
 			return 0
 		}
 		path := filepath.Join(baseDir, "packs", pack, "pack.json")
@@ -277,7 +278,7 @@ func runAdd(baseDir string, opts flags, args []string) int {
 		return 0
 	case "action":
 		if len(args) < 4 {
-			fmt.Println("Uso: tellme add action <project> <name> <command>")
+			fmt.Println("Uso: dm add action <project> <name> <command>")
 			return 0
 		}
 		project := args[1]
@@ -307,14 +308,14 @@ func runAdd(baseDir string, opts flags, args []string) int {
 		fmt.Println("OK: action aggiunta")
 		return 0
 	default:
-		fmt.Println("Uso: tellme add <jump|run|project|action> ...")
+		fmt.Println("Uso: dm add <jump|run|project|action> ...")
 		return 0
 	}
 }
 
 func runPlugin(baseDir string, args []string) int {
 	if len(args) == 0 {
-		fmt.Println("Uso: tellme plugin <list|run> ...")
+		fmt.Println("Uso: dm plugin <list|run> ...")
 		return 0
 	}
 	switch args[0] {
@@ -334,7 +335,7 @@ func runPlugin(baseDir string, args []string) int {
 		return 0
 	case "run":
 		if len(args) < 2 {
-			fmt.Println("Uso: tellme plugin run <name> [args...]")
+			fmt.Println("Uso: dm plugin run <name> [args...]")
 			return 0
 		}
 		if err := plugins.Run(baseDir, args[1], args[2:]); err != nil {
@@ -343,20 +344,20 @@ func runPlugin(baseDir string, args []string) int {
 		}
 		return 0
 	default:
-		fmt.Println("Uso: tellme plugin <list|run> ...")
+		fmt.Println("Uso: dm plugin <list|run> ...")
 		return 0
 	}
 }
 
 func runPack(baseDir string, args []string) int {
 	if len(args) < 1 {
-		fmt.Println("Uso: tellme pack <new|list|info|use|current|unset> [name]")
+		fmt.Println("Uso: dm pack <new|list|info|use|current|unset> [name]")
 		return 0
 	}
 	switch args[0] {
 	case "new":
 		if len(args) < 2 {
-			fmt.Println("Uso: tellme pack new <name>")
+			fmt.Println("Uso: dm pack new <name>")
 			return 0
 		}
 		name := args[1]
@@ -382,7 +383,7 @@ func runPack(baseDir string, args []string) int {
 		return 0
 	case "info":
 		if len(args) < 2 {
-			fmt.Println("Uso: tellme pack info <name>")
+			fmt.Println("Uso: dm pack info <name>")
 			return 0
 		}
 		info, err := store.GetPackInfo(baseDir, args[1])
@@ -402,7 +403,7 @@ func runPack(baseDir string, args []string) int {
 		return 0
 	case "use":
 		if len(args) < 2 {
-			fmt.Println("Uso: tellme pack use <name>")
+			fmt.Println("Uso: dm pack use <name>")
 			return 0
 		}
 		name := args[1]
@@ -436,7 +437,7 @@ func runPack(baseDir string, args []string) int {
 		fmt.Println("OK: pack attivo rimosso")
 		return 0
 	default:
-		fmt.Println("Uso: tellme pack <new|list|info|use|current|unset> [name]")
+		fmt.Println("Uso: dm pack <new|list|info|use|current|unset> [name]")
 		return 0
 	}
 }

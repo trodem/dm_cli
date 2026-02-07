@@ -10,7 +10,7 @@ import (
 
 func InKnowledge(knowledgeDir, query string) {
 	if query == "" {
-		fmt.Println("Uso: tellme find <query>")
+		fmt.Println("Uso: dm find <query>")
 		return
 	}
 	if knowledgeDir == "" {

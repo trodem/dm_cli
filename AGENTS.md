@@ -3,7 +3,7 @@
 Repository guidelines for automated agents.
 
 ## Scope
-- Target: Go CLI tool `tellme`.
+- Target: Go CLI tool `dm`.
 - Keep changes focused and minimal.
 - Prefer incremental, reversible edits.
 
@@ -11,7 +11,7 @@ Repository guidelines for automated agents.
 - Entry point: `main.go`
 - Core logic: `internal/`
 - Config files:
-  - `tellme.json` (root includes)
+  - `dm.json` (root includes)
   - `packs/*/pack.json`
   - `packs/*/knowledge/`
 
@@ -22,7 +22,7 @@ Repository guidelines for automated agents.
 - Use `internal/` packages for new functionality.
 
 ## Config Rules
-- Use `include` in `tellme.json` for scale.
+- Use `include` in `dm.json` for scale.
 - Split by domain using packs:
   - `packs/<name>/pack.json`
   - `packs/<name>/knowledge/`
