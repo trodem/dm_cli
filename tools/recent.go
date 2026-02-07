@@ -1,0 +1,82 @@
+package tools
+
+import (
+	"bufio"
+	"fmt"
+	"io/fs"
+	"path/filepath"
+	"sort"
+	"strconv"
+	"strings"
+	"time"
+
+	"cli/internal/filesearch"
+)
+
+type recentItem struct {
+	Path    string
+	ModTime time.Time
+	Size    int64
+}
+
+func RunRecent(baseDir string, r *bufio.Reader) int {
+	base := prompt(r, "Base path", "")
+	if strings.TrimSpace(base) == "" {
+		fmt.Println("Error: base path is required.")
+		return 1
+	}
+	limitStr := prompt(r, "Limit", "20")
+	limit, err := strconv.Atoi(strings.TrimSpace(limitStr))
+	if err != nil || limit <= 0 {
+		fmt.Println("Error: invalid limit.")
+		return 1
+	}
+
+	items, err := collectRecent(base)
+	if err != nil {
+		fmt.Println("Error:", err)
+		return 1
+	}
+	if len(items) == 0 {
+		fmt.Println("No files found.")
+		return 0
+	}
+
+	sort.Slice(items, func(i, j int) bool {
+		return items[i].ModTime.After(items[j].ModTime)
+	})
+	if len(items) > limit {
+		items = items[:limit]
+	}
+
+	for _, it := range items {
+		fmt.Printf("%s | %s | %s\n", it.ModTime.Format("2006-01-02 15:04"), filesearch.FormatSize(it.Size), it.Path)
+	}
+	return 0
+}
+
+func collectRecent(base string) ([]recentItem, error) {
+	var items []recentItem
+	err := filepath.WalkDir(base, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return nil
+		}
+		if d.IsDir() {
+			return nil
+		}
+		info, err := d.Info()
+		if err != nil {
+			return nil
+		}
+		items = append(items, recentItem{
+			Path:    path,
+			ModTime: info.ModTime(),
+			Size:    info.Size(),
+		})
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return items, nil
+}

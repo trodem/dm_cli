@@ -111,3 +111,7 @@ func formatSize(n int64) string {
 		return fmt.Sprintf("%dB", n)
 	}
 }
+
+func FormatSize(n int64) string {
+	return formatSize(n)
+}

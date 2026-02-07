@@ -1,0 +1,1 @@
+- 2026-02-07 17:00 test per una informazione aggiuntiva

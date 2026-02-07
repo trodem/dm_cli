@@ -18,7 +18,7 @@ Comandi principali:
   dm <project> <action>     esegue un comando di progetto
   dm run <alias>            esegue un alias definito in run
   dm find <query>           cerca nei markdown knowledge
-  dm tools                  strumenti (search/rename)
+  dm tools                  strumenti (search/rename/note/recent/backup/clean)
 
 Gestione pack:
   dm pack new <name>        crea un nuovo pack
@@ -71,6 +71,10 @@ dm tools
 Menu:
   1) Search files
   2) Rename files
+  3) Quick note
+  4) Recent files
+  5) Pack backup
+  6) Clean empty folders
 
 Search files:
 - Recursive search by name contains or extension.
@@ -82,6 +86,19 @@ Rename files:
 - Simple text (contains + replace).
 - Name filter is case-insensitive.
 - Replace is case-insensitive by default; prompt allows case-sensitive.
+
+Quick note:
+- Append a one-line note to packs/<pack>/knowledge/inbox.md.
+- If a pack is active, it is used as default.
+
+Recent files:
+- Show most recently modified files in a path.
+
+Pack backup:
+- Create a zip of packs/<pack> into backups/.
+
+Clean empty folders:
+- Find and remove empty folders in a path.
 
 Examples:
   dm tools

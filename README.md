@@ -190,7 +190,7 @@ If `rg` (ripgrep) is installed, it is used automatically for faster search.
 If you use packs, pass `--pack <name>` so search uses that pack knowledge folder.
 
 ## Tools
-Interactive menu for file search and rename:
+Interactive menu for file search, rename, quick notes, recent files, pack backup, and clean empty folders:
 ```bash
 dm tools
 ```

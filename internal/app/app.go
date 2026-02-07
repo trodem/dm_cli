@@ -41,7 +41,19 @@ func Run(args []string) int {
 	}
 
 	if len(rest) == 0 {
-		ui.PrintHelp(cfg)
+		packs, _ := store.ListPacks(baseDir)
+		active, _ := store.GetActivePack(baseDir)
+		cfgPath := filepath.Join(baseDir, "dm.json")
+		cfgExists := fileExists(cfgPath)
+		ascii := readOptionalFile(filepath.Join(baseDir, "logo.txt"))
+		ui.PrintSplash(ui.SplashData{
+			BaseDir:    baseDir,
+			PackCount:  len(packs),
+			ActivePack: active,
+			ConfigPath: cfgPath,
+			ConfigUsed: cfgExists,
+			Ascii:      ascii,
+		})
 		return 0
 	}
 
@@ -121,6 +133,21 @@ func exeDir() (string, error) {
 		return "", err
 	}
 	return filepath.Dir(p), nil
+}
+
+func fileExists(path string) bool {
+	if _, err := os.Stat(path); err == nil {
+		return true
+	}
+	return false
+}
+
+func readOptionalFile(path string) string {
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return ""
+	}
+	return string(b)
 }
 
 type flags struct {
