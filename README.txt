@@ -38,8 +38,9 @@ Set active pack:
 Show pack info:
   dm pack info <name>
 
-Show pack help:
-  dm pack help <name>
+Show pack command help:
+  dm pack --help
+  dm pack <name> --help
 
 Tools menu:
   dm tools

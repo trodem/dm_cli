@@ -37,19 +37,14 @@ func Run(args []string) int {
 	root.PersistentFlags().BoolVar(&opts.NoCache, "no-cache", false, "disable config cache")
 	root.PersistentFlags().StringVar(&opts.Profile, "profile", "", "use profile")
 	root.PersistentFlags().StringVarP(&opts.Pack, "pack", "p", "", "use pack")
+	root.PersistentFlags().BoolP("tools", "t", false, "shortcut for 'tools' command")
+	root.PersistentFlags().BoolP("packs", "k", false, "shortcut for 'pack' command")
+	root.PersistentFlags().BoolP("plugins", "g", false, "shortcut for 'plugin' command")
 	root.CompletionOptions.DisableDefaultCmd = true
 
 	addCobraSubcommands(root, &opts)
 	addCompletionCommands(root)
-
-	// Keep "dm help <topic>" behavior in legacy dispatcher.
-	root.SetHelpCommand(&cobra.Command{
-		Use:    "no-help",
-		Hidden: true,
-	})
-	root.SetHelpFunc(func(cmd *cobra.Command, args []string) {
-		_ = runLegacy([]string{"help"})
-	})
+	applySubcommandHelpTemplate(root)
 
 	root.SetArgs(rewriteGroupShortcuts(args))
 

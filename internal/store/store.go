@@ -31,7 +31,6 @@ func CreatePack(baseDir, name string) error {
 		return err
 	}
 	packPath := filepath.Join(packDir, "pack.json")
-	helpPath := filepath.Join(packDir, "HELP.md")
 	pf := PackFile{
 		Jump:     map[string]string{},
 		Run:      map[string]string{},
@@ -43,15 +42,7 @@ func CreatePack(baseDir, name string) error {
 	if err := writeJSON(packPath, pf); err != nil {
 		return err
 	}
-	help := "# Pack " + name + "\n\n" +
-		"## Purpose\n" +
-		"- Describe what this pack is for.\n\n" +
-		"## Common Commands\n" +
-		"- Example: `dm -p " + name + " run <alias>`\n" +
-		"- Example: `dm -p " + name + " <project> <action>`\n\n" +
-		"## Notes\n" +
-		"- Add tips or conventions here.\n"
-	return os.WriteFile(helpPath, []byte(help), 0644)
+	return nil
 }
 
 func ListPacks(baseDir string) ([]string, error) {
@@ -146,10 +137,6 @@ func ClearActivePack(baseDir string) error {
 		return err
 	}
 	return nil
-}
-
-func PackHelpPath(baseDir, name string) string {
-	return filepath.Join(baseDir, "packs", name, "HELP.md")
 }
 
 func LoadPackFile(path string) (PackFile, error) {

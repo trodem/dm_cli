@@ -44,8 +44,6 @@ func runLegacy(args []string) int {
 
 	// comandi globali
 	switch args[0] {
-	case "help":
-		return runHelp(baseDir, cfg, args[1:])
 	case "aliases", "config":
 		ui.PrintAliases(cfg)
 		return 0
@@ -409,12 +407,6 @@ func runPack(baseDir string, args []string) int {
 		return 0
 	}
 	switch args[0] {
-	case "help":
-		if len(args) < 2 {
-			fmt.Println("Uso: dm pack help <name>")
-			return 0
-		}
-		return runPackHelp(baseDir, args[1])
 	case "new":
 		if len(args) < 2 {
 			fmt.Println("Uso: dm pack new <name>")
@@ -497,79 +489,7 @@ func runPack(baseDir string, args []string) int {
 		fmt.Println("OK: pack attivo rimosso")
 		return 0
 	default:
-		fmt.Println("Uso: dm pack <new|list|info|use|current|unset|help> [name]")
+		fmt.Println("Uso: dm pack <new|list|info|use|current|unset> [name]")
 		return 0
 	}
-}
-
-func runHelp(baseDir string, cfg config.Config, args []string) int {
-	if len(args) == 0 {
-		ui.PrintHelp(cfg)
-		return 0
-	}
-	switch args[0] {
-	case "pack":
-		if len(args) < 2 {
-			fmt.Println("Uso: dm help pack <name>")
-			return 0
-		}
-		return runPackHelp(baseDir, args[1])
-	case "tools":
-		ui.PrintToolsHelp()
-		return 0
-	case "plugin":
-		ui.PrintPluginHelp()
-		return 0
-	default:
-		ui.PrintHelp(cfg)
-		return 0
-	}
-}
-
-func runPackHelp(baseDir, name string) int {
-	if !store.PackExists(baseDir, name) {
-		fmt.Println("Pack non trovato:", name)
-		return 1
-	}
-	packPath := filepath.Join(baseDir, "packs", name, "pack.json")
-	pf, err := store.LoadPackFile(packPath)
-	if err != nil {
-		fmt.Println("Errore:", err)
-		return 1
-	}
-	helpPath := store.PackHelpPath(baseDir, name)
-	if data, err := os.ReadFile(helpPath); err == nil {
-		fmt.Println(string(data))
-	} else {
-		fmt.Printf("Pack help non trovato: %s\n", helpPath)
-	}
-	fmt.Printf("pack: %s\n", name)
-	fmt.Printf("path: %s\n", packPath)
-	if pf.Search.Knowledge != "" {
-		fmt.Printf("knowledge: %s\n", pf.Search.Knowledge)
-	}
-	if len(pf.Jump) > 0 {
-		fmt.Println("\nJUMPS")
-		ui.PrintMap(pf.Jump)
-	}
-	if len(pf.Run) > 0 {
-		fmt.Println("\nRUNS")
-		ui.PrintMap(pf.Run)
-	}
-	if len(pf.Projects) > 0 {
-		fmt.Println("\nPROJECTS")
-		ui.PrintProjects(convertProjects(pf.Projects))
-	}
-	return 0
-}
-
-func convertProjects(in map[string]store.Project) map[string]config.Project {
-	out := map[string]config.Project{}
-	for k, v := range in {
-		out[k] = config.Project{
-			Path:     v.Path,
-			Commands: v.Commands,
-		}
-	}
-	return out
 }
