@@ -36,11 +36,11 @@ go build -o dm.exe .
 
 Local release package (Windows PowerShell):
 ```powershell
-.\release.ps1 -Version v0.2.0
+.\scripts\release.ps1 -Version v0.2.0
 ```
 All standard targets (windows/linux/darwin):
 ```powershell
-.\release.ps1 -Version v0.2.0 -AllTargets
+.\scripts\release.ps1 -Version v0.2.0 -AllTargets
 ```
 This produces:
 - `dist/dm-v0.2.0-windows-amd64/`
@@ -305,6 +305,7 @@ dm plugin run <name> [args...]
 |-- main.go
 |-- packs
 |-- tools
+|-- scripts
 `-- internal
     |-- app
     |-- config

@@ -4,4 +4,4 @@ Param(
 )
 
 $here = Split-Path -Parent $MyInvocation.MyCommand.Path
-& "$here\dm.exe" @Args
+& "$here\..\dm.exe" @Args

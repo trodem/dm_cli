@@ -13,9 +13,9 @@ if (-not $Version.StartsWith("v")) {
   $Version = "v$Version"
 }
 
-$repoRoot = $PSScriptRoot
+$repoRoot = Split-Path -Parent $PSScriptRoot
 if ([string]::IsNullOrWhiteSpace($repoRoot)) {
-  $repoRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
+  $repoRoot = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
 }
 Set-Location $repoRoot
 
@@ -83,8 +83,8 @@ try {
     if (Test-Path "LICENSE") {
       Copy-Item "LICENSE" (Join-Path $stageDir "LICENSE")
     }
-    if (Test-Path "install.ps1") {
-      Copy-Item "install.ps1" (Join-Path $stageDir "install.ps1")
+    if (Test-Path "scripts/install.ps1") {
+      Copy-Item "scripts/install.ps1" (Join-Path $stageDir "install.ps1")
     }
 
     if (Test-Path $zipPath) {
