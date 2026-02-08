@@ -2,6 +2,7 @@ package app
 
 import (
 	"fmt"
+	"path/filepath"
 	"strings"
 
 	"cli/internal/config"
@@ -118,7 +119,7 @@ func addCobraSubcommands(root *cobra.Command, opts *flags) {
 			if err != nil {
 				return err
 			}
-			code := runValidate(rt.Config)
+			code := runValidate(rt.BaseDir, rt.Config)
 			if code != 0 {
 				return exitCodeError{code: code}
 			}
@@ -158,29 +159,129 @@ func newPackCommand(opts *flags) *cobra.Command {
 		return nil
 	}
 
-	packCmd.AddCommand(&cobra.Command{
+	var newPackDescription string
+	newPackCmd := &cobra.Command{
 		Use:   "new <name>",
 		Short: "Create a new pack",
 		Long: "Create packs/<name>/ with:\n" +
 			"- pack.json\n" +
 			"- knowledge/",
-		Example: "dm pack new work",
-		Args:  cobra.ExactArgs(1),
+		Example: "dm pack new work\n" +
+			"dm pack new work --description \"Work projects and notes\"",
+		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runPackArgs("new", args[0])
+			rt, err := loadRuntime(*opts)
+			if err != nil {
+				return err
+			}
+			name := args[0]
+			if err := store.CreatePack(rt.BaseDir, name); err != nil {
+				return err
+			}
+			if strings.TrimSpace(newPackDescription) != "" {
+				path := filepath.Join(rt.BaseDir, "packs", name, "pack.json")
+				pf, err := store.LoadPackFile(path)
+				if err != nil {
+					return err
+				}
+				pf.Description = strings.TrimSpace(newPackDescription)
+				if err := store.SavePackFile(path, pf); err != nil {
+					return err
+				}
+			}
+			fmt.Println("OK: pack creato")
+			return nil
 		},
-	})
+	}
+	newPackCmd.Flags().StringVar(&newPackDescription, "description", "", "description for the pack")
+	packCmd.AddCommand(newPackCmd)
 	packCmd.AddCommand(&cobra.Command{
 		Use:   "list",
 		Short: "List available packs",
 		Long:  "Show all packs that contain packs/<name>/pack.json.",
 		Example: "dm pack list\n" +
 			"dm -k list",
-		Args:  cobra.NoArgs,
+		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runPackArgs("list")
 		},
 	})
+	var (
+		editDescription string
+		editSummary     string
+		editOwner       string
+		editTags        []string
+		editExamples    []string
+		replaceTags     bool
+		replaceExamples bool
+	)
+	editCmd := &cobra.Command{
+		Use:   "edit <name>",
+		Short: "Edit pack metadata",
+		Long: "Update pack metadata used by dynamic Cobra help.\n" +
+			"Only provided flags are changed.",
+		Example: "dm pack edit git --description \"Git workflows\"\n" +
+			"dm pack edit git --summary \"Git notes\" --owner demtro --tag vcs --tag git\n" +
+			"dm pack edit git --example \"dm -p git find rebase\" --replace-examples",
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			rt, err := loadRuntime(*opts)
+			if err != nil {
+				return err
+			}
+			name := args[0]
+			path := filepath.Join(rt.BaseDir, "packs", name, "pack.json")
+			pf, err := store.LoadPackFile(path)
+			if err != nil {
+				return err
+			}
+			changed := false
+			if cmd.Flags().Changed("description") {
+				pf.Description = strings.TrimSpace(editDescription)
+				changed = true
+			}
+			if cmd.Flags().Changed("summary") {
+				pf.Summary = strings.TrimSpace(editSummary)
+				changed = true
+			}
+			if cmd.Flags().Changed("owner") {
+				pf.Owner = strings.TrimSpace(editOwner)
+				changed = true
+			}
+			if cmd.Flags().Changed("tag") || replaceTags {
+				if replaceTags {
+					pf.Tags = uniqueNonEmpty(editTags)
+				} else {
+					pf.Tags = uniqueNonEmpty(append(pf.Tags, editTags...))
+				}
+				changed = true
+			}
+			if cmd.Flags().Changed("example") || replaceExamples {
+				if replaceExamples {
+					pf.Examples = uniqueNonEmpty(editExamples)
+				} else {
+					pf.Examples = uniqueNonEmpty(append(pf.Examples, editExamples...))
+				}
+				changed = true
+			}
+			if !changed {
+				return fmt.Errorf("nessuna modifica: usa almeno un flag metadata")
+			}
+			if err := store.SavePackFile(path, pf); err != nil {
+				return err
+			}
+			fmt.Println("OK: pack metadata aggiornata")
+			return nil
+		},
+	}
+	editCmd.Flags().StringVar(&editDescription, "description", "", "set pack description")
+	editCmd.Flags().StringVar(&editSummary, "summary", "", "set one-line summary")
+	editCmd.Flags().StringVar(&editOwner, "owner", "", "set owner")
+	editCmd.Flags().StringArrayVar(&editTags, "tag", nil, "add tag (repeatable)")
+	editCmd.Flags().StringArrayVar(&editExamples, "example", nil, "add example command (repeatable)")
+	editCmd.Flags().BoolVar(&replaceTags, "replace-tags", false, "replace tags instead of appending")
+	editCmd.Flags().BoolVar(&replaceExamples, "replace-examples", false, "replace examples instead of appending")
+	packCmd.AddCommand(editCmd)
 	packCmd.AddCommand(&cobra.Command{
 		Use:   "info <name>",
 		Short: "Show pack info",
@@ -189,7 +290,7 @@ func newPackCommand(opts *flags) *cobra.Command {
 			"- knowledge path\n" +
 			"- jumps/runs/projects/actions",
 		Example: "dm pack info git",
-		Args:  cobra.ExactArgs(1),
+		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runPackArgs("info", args[0])
 		},
@@ -201,27 +302,27 @@ func newPackCommand(opts *flags) *cobra.Command {
 			"Stored in .dm.active-pack next to the executable.",
 		Example: "dm pack use git\n" +
 			"dm -k use vim",
-		Args:  cobra.ExactArgs(1),
+		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runPackArgs("use", args[0])
 		},
 	})
 	packCmd.AddCommand(&cobra.Command{
-		Use:   "current",
-		Short: "Show active pack",
-		Long:  "Print the currently active pack, if set.",
+		Use:     "current",
+		Short:   "Show active pack",
+		Long:    "Print the currently active pack, if set.",
 		Example: "dm pack current",
-		Args:  cobra.NoArgs,
+		Args:    cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runPackArgs("current")
 		},
 	})
 	packCmd.AddCommand(&cobra.Command{
-		Use:   "unset",
-		Short: "Unset active pack",
-		Long:  "Remove the currently active pack selection.",
+		Use:     "unset",
+		Short:   "Unset active pack",
+		Long:    "Remove the currently active pack selection.",
 		Example: "dm pack unset",
-		Args:  cobra.NoArgs,
+		Args:    cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runPackArgs("unset")
 		},
@@ -252,9 +353,40 @@ func addDynamicPackProfileCommands(packCmd *cobra.Command, runPackArgs func(args
 		if err != nil {
 			continue
 		}
+		summary := strings.TrimSpace(info.Summary)
+		if summary == "" {
+			summary = strings.TrimSpace(info.Description)
+		}
+		if summary == "" {
+			summary = "Pack profile"
+		}
+		desc := strings.TrimSpace(info.Description)
+		if desc == "" {
+			desc = "(no description)"
+		}
+		owner := strings.TrimSpace(info.Owner)
+		if owner == "" {
+			owner = "(not set)"
+		}
+		tags := "(none)"
+		if len(info.Tags) > 0 {
+			tags = strings.Join(info.Tags, ", ")
+		}
+		examples := info.Examples
+		if len(examples) == 0 {
+			examples = []string{
+				fmt.Sprintf("dm -p %s find <query>", n),
+				fmt.Sprintf("dm -p %s run <alias>", n),
+			}
+		}
+		exampleText := strings.Join(examples, "\n")
 		longText := fmt.Sprintf(
-			"Pack: %s\nPath: %s\nKnowledge: %s\nJumps: %d\nRuns: %d\nProjects: %d\nActions: %d",
+			"Pack: %s\nSummary: %s\nDescription: %s\nOwner: %s\nTags: %s\nPath: %s\nKnowledge: %s\nJumps: %d\nRuns: %d\nProjects: %d\nActions: %d",
 			info.Name,
+			summary,
+			desc,
+			owner,
+			tags,
 			info.Path,
 			info.Knowledge,
 			info.Jumps,
@@ -263,14 +395,11 @@ func addDynamicPackProfileCommands(packCmd *cobra.Command, runPackArgs func(args
 			info.Actions,
 		)
 		packCmd.AddCommand(&cobra.Command{
-			Use:   n,
-			Short: fmt.Sprintf("Pack profile %s", n),
-			Long:  longText,
-			Example: fmt.Sprintf(
-				"dm pack %s --help\ndm pack use %s\ndm pack info %s\ndm -p %s find <query>",
-				n, n, n, n,
-			),
-			Args: cobra.NoArgs,
+			Use:     n,
+			Short:   fmt.Sprintf("Pack profile %s: %s", n, summary),
+			Long:    longText,
+			Example: exampleText,
+			Args:    cobra.NoArgs,
 			RunE: func(cmd *cobra.Command, args []string) error {
 				return cmd.Help()
 			},
@@ -436,4 +565,21 @@ func runFindCommand(opts flags, args []string) error {
 	knowledgeDir := config.ResolvePath(rt.BaseDir, rt.Config.Search.Knowledge)
 	search.InKnowledge(knowledgeDir, strings.Join(args, " "))
 	return nil
+}
+
+func uniqueNonEmpty(items []string) []string {
+	out := make([]string, 0, len(items))
+	seen := map[string]struct{}{}
+	for _, raw := range items {
+		v := strings.TrimSpace(raw)
+		if v == "" {
+			continue
+		}
+		if _, ok := seen[v]; ok {
+			continue
+		}
+		seen[v] = struct{}{}
+		out = append(out, v)
+	}
+	return out
 }

@@ -1,4 +1,15 @@
 {
+  "description": "Vim and Neovim commands and knowledge",
+  "summary": "Vim/Neovim command shortcuts and notes",
+  "tags": [
+    "vim",
+    "nvim",
+    "editor"
+  ],
+  "examples": [
+    "dm -p vim find mappings",
+    "dm -p vim run vim-version"
+  ],
   "jump": {},
   "run": {
     "vim": "vim",

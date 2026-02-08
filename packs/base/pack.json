@@ -1,4 +1,13 @@
 {
+  "description": "Base pack with shared defaults",
+  "summary": "Shared defaults and minimal baseline pack",
+  "tags": [
+    "base"
+  ],
+  "examples": [
+    "dm -p base find <query>",
+    "dm -p base run <alias>"
+  ],
   "jump": {},
   "run": {},
   "projects": {},

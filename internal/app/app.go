@@ -54,7 +54,7 @@ func runLegacy(args []string) int {
 	case "pack":
 		return runPack(baseDir, args[1:])
 	case "validate":
-		return runValidate(cfg)
+		return runValidate(baseDir, cfg)
 	case "plugin":
 		return runPlugin(baseDir, args[1:])
 	case "tools":
@@ -216,8 +216,9 @@ func parseFlags(args []string) (flags, []string) {
 	return f, out
 }
 
-func runValidate(cfg config.Config) int {
+func runValidate(baseDir string, cfg config.Config) int {
 	issues := config.Validate(cfg)
+	issues = append(issues, validatePackMetadata(baseDir)...)
 	if len(issues) == 0 {
 		fmt.Println("OK: configurazione valida")
 		return 0
@@ -226,6 +227,38 @@ func runValidate(cfg config.Config) int {
 		fmt.Printf("%s: %s\n", issue.Level, issue.Message)
 	}
 	return 1
+}
+
+func validatePackMetadata(baseDir string) []config.Issue {
+	var issues []config.Issue
+	packs, err := store.ListPacks(baseDir)
+	if err != nil {
+		return issues
+	}
+	for _, name := range packs {
+		path := filepath.Join(baseDir, "packs", name, "pack.json")
+		pf, err := store.LoadPackFile(path)
+		if err != nil {
+			issues = append(issues, config.Issue{
+				Level:   "warn",
+				Message: fmt.Sprintf("pack '%s': cannot read pack.json (%v)", name, err),
+			})
+			continue
+		}
+		if strings.TrimSpace(pf.Description) == "" {
+			issues = append(issues, config.Issue{
+				Level:   "warn",
+				Message: fmt.Sprintf("pack '%s': description is empty", name),
+			})
+		}
+		if len(pf.Examples) == 0 {
+			issues = append(issues, config.Issue{
+				Level:   "warn",
+				Message: fmt.Sprintf("pack '%s': examples is empty", name),
+			})
+		}
+	}
+	return issues
 }
 
 func runList(cfg config.Config, args []string) int {
@@ -445,8 +478,26 @@ func runPack(baseDir string, args []string) int {
 		}
 		fmt.Printf("pack: %s\n", info.Name)
 		fmt.Printf("path: %s\n", info.Path)
+		if strings.TrimSpace(info.Description) != "" {
+			fmt.Printf("description: %s\n", info.Description)
+		}
+		if strings.TrimSpace(info.Summary) != "" {
+			fmt.Printf("summary: %s\n", info.Summary)
+		}
+		if strings.TrimSpace(info.Owner) != "" {
+			fmt.Printf("owner: %s\n", info.Owner)
+		}
+		if len(info.Tags) > 0 {
+			fmt.Printf("tags: %s\n", strings.Join(info.Tags, ", "))
+		}
 		if info.Knowledge != "" {
 			fmt.Printf("knowledge: %s\n", info.Knowledge)
+		}
+		if len(info.Examples) > 0 {
+			fmt.Println("examples:")
+			for _, ex := range info.Examples {
+				fmt.Printf("- %s\n", ex)
+			}
 		}
 		fmt.Printf("jumps: %d\n", info.Jumps)
 		fmt.Printf("runs: %d\n", info.Runs)

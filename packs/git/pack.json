@@ -1,4 +1,15 @@
 {
+  "description": "Git workflows, aliases, and troubleshooting notes",
+  "summary": "Git aliases and project actions",
+  "tags": [
+    "git",
+    "vcs"
+  ],
+  "examples": [
+    "dm -p git find rebase",
+    "dm -p git run gs",
+    "dm git-tools graph"
+  ],
   "jump": {},
   "run": {
     "gs": "git status",
