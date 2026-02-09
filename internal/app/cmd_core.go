@@ -573,20 +573,6 @@ func resolvePackBaseDir() (string, error) {
 }
 
 func newPluginCommand(opts *flags) *cobra.Command {
-	pluginCmd := &cobra.Command{
-		Use:   "plugin",
-		Short: "Manage plugins",
-		Long:  "List and execute scripts/functions from the plugins directory.",
-		Example: "dm plugin list\n" +
-			"dm plugin list --functions\n" +
-			"dm plugin info restart_backend\n" +
-			"dm plugin run paint",
-		Args: cobra.NoArgs,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return cmd.Help()
-		},
-	}
-
 	runPluginArgs := func(args ...string) error {
 		rt, err := loadRuntime(*opts)
 		if err != nil {
@@ -597,6 +583,21 @@ func newPluginCommand(opts *flags) *cobra.Command {
 			return exitCodeError{code: code}
 		}
 		return nil
+	}
+
+	pluginCmd := &cobra.Command{
+		Use:   "plugin",
+		Short: "Manage plugins",
+		Long:  "List and execute scripts/functions from the plugins directory.",
+		Example: "dm plugin list\n" +
+			"dm plugin list --functions\n" +
+			"dm plugin info restart_backend\n" +
+			"dm plugin menu\n" +
+			"dm plugin run paint",
+		Args: cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runPluginArgs()
+		},
 	}
 
 	var listFunctions bool
@@ -619,6 +620,14 @@ func newPluginCommand(opts *flags) *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runPluginArgs("info", args[0])
+		},
+	})
+	pluginCmd.AddCommand(&cobra.Command{
+		Use:   "menu",
+		Short: "Open interactive plugin menu",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runPluginArgs("menu")
 		},
 	})
 	pluginCmd.AddCommand(&cobra.Command{

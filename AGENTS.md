@@ -49,6 +49,19 @@ Repository guidelines for automated agents.
   - `dm -t <name>`
 - Keep tool aliases consistent (`search/s`, `rename/r`, `note/n`, `recent/rec`, `backup/b`, `clean/c`).
 - For tools that request `Base path`, default to current working directory.
+- Plugin menu UX:
+  - `dm -g` / `dm plugin` should open the interactive plugin menu.
+  - Keep plugin navigation two-level:
+    1. plugin file selection
+    2. function selection inside the chosen file
+  - Support both number and letter shortcuts in plugin menu selections.
+  - Keep `h <n|letter>` for function help, `b` for back, `q` for quit.
+  - After function execution/help in menu, pause with an explicit "press enter to continue" prompt.
+- Keep legacy plugin commands working:
+  - `dm plugin list`
+  - `dm plugin list --functions`
+  - `dm plugin info <name>`
+  - `dm plugin run <name> [args...]`
 
 ## PowerShell Plugin Conventions
 - Store public PowerShell plugin commands in `plugins/functions/*.ps1`.
@@ -69,6 +82,17 @@ Repository guidelines for automated agents.
   - `go run ./scripts/gen_git_cheatsheet`
 - Validate plugin help blocks before finalizing changes:
   - `go run ./scripts/check_plugin_help.go`
+
+## Menu And Output Styling
+- Use shared color helpers from `internal/ui/pretty.go` (for example `Accent`, `Warn`, `Muted`, `Prompt`) for interactive menus.
+- Apply the same style across all interactive menus in the project (tools, target actions, plugin menu, and future menus).
+- Keep prompts colorized and explicit (for example `Select option >`, `Args (optional) >`).
+- Use `Prompt(...)` for user input questions, `Warn(...)` for cancellations, and `Error(...)` for invalid selections.
+- Preserve readability:
+  - highlight primary selectable labels
+  - keep synopsis/secondary hints muted
+  - avoid excessive decoration that reduces scanability
+- Respect `NO_COLOR` behavior (color output must remain optional).
 
 ## Build And Lint
 - Prefer `go test ./...` before changes are finalized.

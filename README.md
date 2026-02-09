@@ -190,6 +190,7 @@ dm validate
 dm plugin list
 dm plugin list --functions
 dm plugin info <name>
+dm plugin menu
 dm plugin run <name> [args...]
 dm <plugin> [args...]
 dm run <alias>
@@ -306,12 +307,21 @@ Recommended layout:
 
 Run:
 ```bash
+dm -g
 dm plugin list
 dm plugin list --functions
 dm plugin info <name>
+dm plugin menu
 dm plugin run <name> [args...]
 dm <name> [args...]
 ```
+
+Interactive plugin menu:
+- `dm -g` (or `dm plugin`) opens a 2-level menu:
+  - select plugin file by number/letter
+  - then select function by number/letter
+  - `h <n|letter>` shows function help
+  - `b` goes back, `q` exits
 
 For cross-shell use, provide both plugin variants when needed:
 - `plugins/<name>.ps1` for PowerShell

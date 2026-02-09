@@ -9,27 +9,60 @@ import (
 	"cli/internal/ui"
 )
 
+type toolMenuItem struct {
+	Key      string
+	Name     string
+	Synopsis string
+}
+
+var toolMenuItems = []toolMenuItem{
+	{Key: "s", Name: "search", Synopsis: "Search files by name/extension"},
+	{Key: "r", Name: "rename", Synopsis: "Batch rename files with preview"},
+	{Key: "n", Name: "note", Synopsis: "Append a quick note to pack inbox"},
+	{Key: "e", Name: "recent", Synopsis: "Show recent files"},
+	{Key: "b", Name: "backup", Synopsis: "Create a pack zip backup"},
+	{Key: "c", Name: "clean", Synopsis: "Delete empty folders"},
+	{Key: "y", Name: "system", Synopsis: "Show system/network snapshot"},
+}
+
 func RunMenu(baseDir string) int {
 	reader := bufio.NewReader(os.Stdin)
 
 	for {
 		ui.PrintSection("Tools")
-		ui.PrintMenuLine("1", "[s] Search files", false)
-		ui.PrintMenuLine("2", "[r] Rename files", false)
-		ui.PrintMenuLine("3", "[n] Quick note", false)
-		ui.PrintMenuLine("4", "[e] Recent files", false)
-		ui.PrintMenuLine("5", "[b] Pack backup", false)
-		ui.PrintMenuLine("6", "[c] Clean empty folders", false)
-		ui.PrintMenuLine("7", "[y] System snapshot", false)
-		ui.PrintMenuLine("0", "[x] Exit", true)
-		fmt.Print("\nSelect option > ")
+		for i, item := range toolMenuItems {
+			fmt.Printf("%2d) [%s] %s %s\n", i+1, ui.Warn(item.Key), ui.Accent(item.Name), ui.Muted("- "+item.Synopsis))
+		}
+		fmt.Println(" 0) " + ui.Error("[x] Exit"))
+		fmt.Println(ui.Muted(" h <n|letter>) Help"))
+		fmt.Print(ui.Prompt("Select tool > "))
 
-		choice := readLine(reader)
+		choice := strings.TrimSpace(readLine(reader))
+		lc := strings.ToLower(choice)
 		switch choice {
 		case "0", "x", "X", "exit", "Exit", "":
 			return 0
 		default:
-			_ = RunByNameWithReader(baseDir, choice, reader)
+			if strings.HasPrefix(lc, "h ") {
+				target := strings.TrimSpace(choice[2:])
+				idx, ok := parseToolMenuChoice(target, len(toolMenuItems))
+				if !ok {
+					fmt.Println(ui.Error("Invalid help selection."))
+					continue
+				}
+				item := toolMenuItems[idx]
+				fmt.Println(ui.Accent("Tool:"), item.Name)
+				fmt.Println(ui.Accent("Summary:"), item.Synopsis)
+				waitForEnter(reader)
+				continue
+			}
+			idx, ok := parseToolMenuChoice(choice, len(toolMenuItems))
+			if !ok {
+				fmt.Println(ui.Error("Invalid selection."))
+				continue
+			}
+			_ = RunByNameWithReader(baseDir, toolMenuItems[idx].Name, reader)
+			waitForEnter(reader)
 		}
 	}
 }
@@ -86,11 +119,49 @@ func normalizeToolName(name string) string {
 	}
 }
 
+func parseToolMenuChoice(choice string, count int) (int, bool) {
+	v := strings.ToLower(strings.TrimSpace(choice))
+	if v == "" {
+		return -1, false
+	}
+	// number
+	n := 0
+	allDigits := true
+	for _, ch := range v {
+		if ch < '0' || ch > '9' {
+			allDigits = false
+			break
+		}
+		n = n*10 + int(ch-'0')
+	}
+	if allDigits {
+		if n >= 1 && n <= count {
+			return n - 1, true
+		}
+		return -1, false
+	}
+	// letter
+	if len(v) == 1 {
+		for i, item := range toolMenuItems {
+			if item.Key == v {
+				return i, true
+			}
+		}
+	}
+	// direct name
+	for i, item := range toolMenuItems {
+		if item.Name == v {
+			return i, true
+		}
+	}
+	return -1, false
+}
+
 func prompt(r *bufio.Reader, label, def string) string {
 	if def != "" {
-		fmt.Printf("%s [%s]: ", label, def)
+		fmt.Printf("%s ", ui.Prompt(fmt.Sprintf("%s [%s]:", label, def)))
 	} else {
-		fmt.Printf("%s: ", label)
+		fmt.Printf("%s ", ui.Prompt(label+":"))
 	}
 	text, _ := r.ReadString('\n')
 	text = strings.TrimSpace(text)
@@ -103,6 +174,11 @@ func prompt(r *bufio.Reader, label, def string) string {
 func readLine(r *bufio.Reader) string {
 	s, _ := r.ReadString('\n')
 	return strings.TrimSpace(s)
+}
+
+func waitForEnter(r *bufio.Reader) {
+	fmt.Print(ui.Prompt("Press Enter to continue..."))
+	_, _ = r.ReadString('\n')
 }
 
 func currentWorkingDir(fallback string) string {

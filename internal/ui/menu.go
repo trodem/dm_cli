@@ -40,7 +40,7 @@ func ShowMenu(cfg config.Config, name, targetPath, baseDir string) {
 	}
 	PrintMenuLine("0", "[x] Exit", false)
 
-	fmt.Print("\nSelect option > ")
+	fmt.Print("\n" + Prompt("Select option > "))
 	choice := readLine()
 
 	switch choice {
@@ -66,7 +66,7 @@ func ShowMenu(cfg config.Config, name, targetPath, baseDir string) {
 		for i, a := range actionKeys {
 			PrintMenuLine(fmt.Sprintf("%d", i+1), a, false)
 		}
-		fmt.Print("\nSelect action > ")
+		fmt.Print("\n" + Prompt("Select action > "))
 		sel := readLine()
 		idx := parseIndex(sel)
 		if idx < 1 || idx > len(actionKeys) {

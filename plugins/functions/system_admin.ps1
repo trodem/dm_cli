@@ -80,7 +80,21 @@ function s_top_cpu {
     param(
         [int]$Count = 15
     )
-    Get-Process | Sort-Object CPU -Descending | Select-Object -First $Count Name, Id, CPU
+    Get-Process |
+        Select-Object Name, Id, @{
+            Name       = "CPUSeconds"
+            Expression = {
+                if ($null -eq $_.CPU) {
+                    return 0.0
+                }
+                if ($_.CPU -is [TimeSpan]) {
+                    return [math]::Round($_.CPU.TotalSeconds, 3)
+                }
+                return [math]::Round([double]$_.CPU, 3)
+            }
+        } |
+        Sort-Object CPUSeconds -Descending |
+        Select-Object -First $Count
 }
 
 <#
@@ -97,7 +111,18 @@ function s_top_mem {
     param(
         [int]$Count = 15
     )
-    Get-Process | Sort-Object WorkingSet64 -Descending | Select-Object -First $Count Name, Id, @{Name = "RAM_MB"; Expression = { [math]::Round($_.WorkingSet64 / 1MB, 1) }}
+    Get-Process |
+        Select-Object Name, Id, @{
+            Name       = "RAM_MB"
+            Expression = {
+                if ($null -eq $_.WorkingSet64) {
+                    return 0.0
+                }
+                return [math]::Round([double]$_.WorkingSet64 / 1MB, 1)
+            }
+        } |
+        Sort-Object RAM_MB -Descending |
+        Select-Object -First $Count
 }
 
 <#

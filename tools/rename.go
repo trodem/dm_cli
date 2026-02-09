@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"cli/internal/renamer"
+	"cli/internal/ui"
 )
 
 func RunRename(baseDir string, r *bufio.Reader) int {
@@ -41,7 +42,7 @@ func RunRename(baseDir string, r *bufio.Reader) int {
 
 	confirm := prompt(r, "Proceed? [y/N]", "N")
 	if strings.ToLower(strings.TrimSpace(confirm)) != "y" {
-		fmt.Println("Canceled.")
+		fmt.Println(ui.Warn("Canceled."))
 		return 0
 	}
 

@@ -24,6 +24,11 @@ type Entry struct {
 	Path string
 }
 
+type FunctionFile struct {
+	Path      string
+	Functions []string
+}
+
 type Info struct {
 	Name        string
 	Kind        string
@@ -102,6 +107,33 @@ func ListEntries(baseDir string, includeFunctions bool) ([]Entry, error) {
 			return out[i].Kind < out[j].Kind
 		}
 		return out[i].Name < out[j].Name
+	})
+	return out, nil
+}
+
+func ListFunctionFiles(baseDir string) ([]FunctionFile, error) {
+	dir := filepath.Join(baseDir, "plugins")
+	files, err := listPowerShellFunctionFiles(dir)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]FunctionFile, 0, len(files))
+	for _, p := range files {
+		names, err := readPowerShellFunctionNames(p)
+		if err != nil {
+			return nil, err
+		}
+		if len(names) == 0 {
+			continue
+		}
+		sort.Strings(names)
+		out = append(out, FunctionFile{
+			Path:      p,
+			Functions: names,
+		})
+	}
+	sort.Slice(out, func(i, j int) bool {
+		return strings.ToLower(out[i].Path) < strings.ToLower(out[j].Path)
 	})
 	return out, nil
 }

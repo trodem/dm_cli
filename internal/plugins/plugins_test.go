@@ -152,3 +152,32 @@ func TestGetInfoForFunctionWithCommentHelp(t *testing.T) {
 		t.Fatalf("expected parameters and examples, got %+v", info)
 	}
 }
+
+func TestListFunctionFiles(t *testing.T) {
+	baseDir := t.TempDir()
+	pluginsDir := filepath.Join(baseDir, "plugins")
+	subDir := filepath.Join(pluginsDir, "functions")
+	if err := os.MkdirAll(subDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(pluginsDir, "vars.ps1"), []byte("function _helper { }\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(subDir, "git.ps1"), []byte("function g_status { }\nfunction g_log { }\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	files, err := ListFunctionFiles(baseDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(files) != 1 {
+		t.Fatalf("expected exactly one function file, got %d", len(files))
+	}
+	if filepath.Base(files[0].Path) != "git.ps1" {
+		t.Fatalf("expected git.ps1, got %s", files[0].Path)
+	}
+	if !reflect.DeepEqual(files[0].Functions, []string{"g_log", "g_status"}) {
+		t.Fatalf("unexpected functions: %v", files[0].Functions)
+	}
+}

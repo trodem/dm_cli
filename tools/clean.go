@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+
+	"cli/internal/ui"
 )
 
 func RunCleanEmpty(r *bufio.Reader) int {
@@ -33,7 +35,7 @@ func RunCleanEmpty(r *bufio.Reader) int {
 
 	confirm := prompt(r, "Delete these folders? [y/N]", "N")
 	if strings.ToLower(strings.TrimSpace(confirm)) != "y" {
-		fmt.Println("Canceled.")
+		fmt.Println(ui.Warn("Canceled."))
 		return 0
 	}
 
