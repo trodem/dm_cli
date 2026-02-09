@@ -1,6 +1,7 @@
 package app
 
 import (
+	"reflect"
 	"testing"
 
 	"cli/internal/store"
@@ -57,5 +58,21 @@ func TestPackDoctorIssues_UnsupportedSchema(t *testing.T) {
 	}
 	if !found {
 		t.Fatalf("expected unsupported schema issue, got %v", issues)
+	}
+}
+
+func TestPackProfileLegacyArgsWithoutCommand(t *testing.T) {
+	got := packProfileLegacyArgs("vim", nil)
+	want := []string{"--pack", "vim"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("expected %v, got %v", want, got)
+	}
+}
+
+func TestPackProfileLegacyArgsWithCommand(t *testing.T) {
+	got := packProfileLegacyArgs("vim", []string{"run", "vim"})
+	want := []string{"--pack", "vim", "run", "vim"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("expected %v, got %v", want, got)
 	}
 }

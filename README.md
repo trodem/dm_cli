@@ -195,6 +195,7 @@ dm tools
 dm tools <tool>
 dm -t [tool]
 dm -k [cmd]
+dm -k <pack> <cmd...>
 dm -g [cmd]
 dm <project> <action>
 dm <name>
@@ -206,6 +207,8 @@ Notes:
   - `-t` / `--tools` => `tools`
   - `-k` / `--packs` => `pack`
   - `-g` / `--plugins` => `plugin`
+- Pack profile shortcut:
+  - `dm -k <pack> <cmd...>` runs `<cmd...>` with `--pack <pack>` (example: `dm -k vim run vim`).
 
 Interactive target:
 ```bash

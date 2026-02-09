@@ -531,12 +531,26 @@ func addDynamicPackProfileCommands(packCmd *cobra.Command, runPackArgs func(args
 			Short:   fmt.Sprintf("Pack profile %s: %s", n, summary),
 			Long:    longText,
 			Example: exampleText,
-			Args:    cobra.NoArgs,
+			Args:    cobra.ArbitraryArgs,
 			RunE: func(cmd *cobra.Command, args []string) error {
-				return cmd.Help()
+				if len(args) == 0 {
+					return cmd.Help()
+				}
+				code := runLegacy(packProfileLegacyArgs(n, args))
+				if code != 0 {
+					return exitCodeError{code: code}
+				}
+				return nil
 			},
 		})
 	}
+}
+
+func packProfileLegacyArgs(name string, args []string) []string {
+	out := make([]string, 0, len(args)+2)
+	out = append(out, "--pack", name)
+	out = append(out, args...)
+	return out
 }
 
 func resolvePackBaseDir() (string, error) {
