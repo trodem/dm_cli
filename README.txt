@@ -6,12 +6,15 @@ This package contains:
 - install.ps1
 - README.md
 - README.txt
+- packs/
+- plugins/
 
 Install (recommended on Windows)
 --------------------------------
 1) Open PowerShell in this folder.
 2) Run:
    .\install.ps1
+   # default target: %LOCALAPPDATA%\Programs\dm-cli
 3) Open a new terminal.
 4) Verify:
    dm --help

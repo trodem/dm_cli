@@ -1,5 +1,5 @@
 param(
-  [string]$InstallDir = "$env:USERPROFILE\Tools\dm",
+  [string]$InstallDir = "$env:LOCALAPPDATA\Programs\dm-cli",
   [switch]$NoPathUpdate,
   [switch]$NoCompletion
 )
@@ -42,6 +42,20 @@ $dst = Join-Path $InstallDir $dstName
 Copy-Item -Force $src $dst
 
 Write-Host "Installed: $dst"
+
+$packsSource = Join-Path $scriptDir "packs"
+if (Test-Path $packsSource) {
+  $packsDest = Join-Path $InstallDir "packs"
+  Copy-Item -Recurse -Force $packsSource $packsDest
+  Write-Host "Installed packs: $packsDest"
+}
+
+$pluginsSource = Join-Path $scriptDir "plugins"
+if (Test-Path $pluginsSource) {
+  $pluginsDest = Join-Path $InstallDir "plugins"
+  Copy-Item -Recurse -Force $pluginsSource $pluginsDest
+  Write-Host "Installed plugins: $pluginsDest"
+}
 
 if (-not $NoPathUpdate) {
   $changed = Add-PathIfMissing -Dir $InstallDir
