@@ -20,9 +20,12 @@ func Run(args []string) int {
 	var opts flags
 
 	root := &cobra.Command{
-		Use:           "dm",
-		Short:         "Personal CLI for jumps, project actions, and knowledge search",
-		Long:          "dm is a personal CLI to jump to folders, run aliases/actions, and search knowledge notes.",
+		Use:   "dm",
+		Short: "Personal CLI for jumps, project actions, and knowledge search",
+		Long:  "dm is a personal CLI to jump to folders, run aliases/actions, and search knowledge notes.",
+		Example: "dm help\n" +
+			"dm help pack\n" +
+			"dm help <function_name>",
 		SilenceErrors: true,
 		SilenceUsage:  true,
 		RunE: func(cmd *cobra.Command, positional []string) error {

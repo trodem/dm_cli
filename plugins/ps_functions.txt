@@ -1,38 +1,110 @@
+<#
+.SYNOPSIS
+Change directory to the configured development root.
+.DESCRIPTION
+Uses $varDevPath from plugins/variables.txt and moves the current shell location there.
+.EXAMPLE
+dm dev_path
+#>
 function dev_path {
     Set-Location "$varDevPath"
 }
 
+<#
+.SYNOPSIS
+Change directory to the STIBS docker folder.
+.DESCRIPTION
+Moves to $varDevPath\50_STIBS\stibs-mono\stibs\docker for local docker compose operations.
+.EXAMPLE
+dm stibs_path
+#>
 function stibs_path {
     Set-Location "$varDevPath\50_STIBS\stibs-mono\stibs\docker"
 }
 
+<#
+.SYNOPSIS
+Change directory to the dm CLI repository.
+.DESCRIPTION
+Moves to the local knowledge/CLI repository rooted under $varSynologyDrivePath.
+.EXAMPLE
+dm dm_cli_path
+#>
 function dm_cli_path {
     Set-Location "$varSynologyDrivePath\5_Demtrodev_Knowledge"
 }
 
 
+<#
+.SYNOPSIS
+Change directory to the configured development root.
+.DESCRIPTION
+Alias helper for quickly returning to $varDevPath.
+.EXAMPLE
+dm dev_path
+#>
 function dev_path {
     Set-Location "$varDevPath"
 }
 
+<#
+.SYNOPSIS
+Open the STIBS mono repository in VS Code.
+.DESCRIPTION
+Launches VS Code pointing to $varDevPath\50_STIBS\stibs-mono.
+.EXAMPLE
+dm code-stibs
+#>
 function code-stibs {
     code "$varDevPath\50_STIBS\stibs-mono"
 }
 
+<#
+.SYNOPSIS
+Show running docker containers.
+.DESCRIPTION
+Runs `docker ps` in the current shell.
+.EXAMPLE
+dm dps
+#>
 function dps {
     docker ps
 }
 
 
+<#
+.SYNOPSIS
+Start HeidiSQL.
+.DESCRIPTION
+Opens the installed HeidiSQL executable.
+.EXAMPLE
+dm heidi
+#>
 function heidi {
     Start-Process "C:\Program Files\HeidiSQL\heidisql.exe"
 }
 
+<#
+.SYNOPSIS
+Start Docker Desktop.
+.DESCRIPTION
+Opens Docker Desktop using the default installation path.
+.EXAMPLE
+dm run_docker_desktop
+#>
 function run_docker_desktop {
     Start-Process "C:\Program Files\Docker\Docker\Docker Desktop.exe"
 }
 
 
+<#
+.SYNOPSIS
+Print a docker readiness message.
+.DESCRIPTION
+Outputs a status line used as placeholder helper.
+.EXAMPLE
+dm get_name
+#>
 function get_name {
    	Write-Host ">> Attendo che Docker sia pronto..."
 }

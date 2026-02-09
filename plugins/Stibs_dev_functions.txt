@@ -1,46 +1,126 @@
 
+<#
+.SYNOPSIS
+Change directory to the STIBS mono repository.
+.DESCRIPTION
+Moves to varStibsMonoPath to work on the main STIBS project.
+.EXAMPLE
+dm stibs
+#>
 function stibs {
     Set-Location varStibsMonoPath
 }
 
+<#
+.SYNOPSIS
+Open the STIBS mono repository in VS Code.
+.DESCRIPTION
+Launches VS Code for varStibsMonoPath.
+.EXAMPLE
+dm code-stibs
+#>
 function code-stibs {
     code varStibsMonoPath
 }
 
 
+<#
+.SYNOPSIS
+Show backend container logs.
+.DESCRIPTION
+Prints the last 50 lines from docker-backend-1.
+.EXAMPLE
+dm stibs_logs_backend
+#>
 function stibs_logs_backend {
     docker logs --tail 50 docker-backend-1
 }
 
 
+<#
+.SYNOPSIS
+Show frontend container logs.
+.DESCRIPTION
+Prints the last 50 lines from docker-frontend-1.
+.EXAMPLE
+dm stibs_logs_frontend
+#>
 function stibs_logs_frontend {
     docker logs --tail 50 docker-frontend-1
 }
 
+<#
+.SYNOPSIS
+Start STIBS development stack.
+.DESCRIPTION
+Runs docker compose up using docker-compose.dev.yml from $varStibsDockerPath.
+.EXAMPLE
+dm stibs_dev_up
+#>
 function stibs_dev_up {
     docker compose -f "$varStibsDockerPath\docker-compose.dev.yml" up
 }
 
+<#
+.SYNOPSIS
+Stop STIBS development stack.
+.DESCRIPTION
+Runs docker compose down using docker-compose.dev.yml from $varStibsDockerPath.
+.EXAMPLE
+dm stibs_dev_down
+#>
 function stibs_dev_down {
     docker compose -f "$varStibsDockerPath\docker-compose.dev.yml" down
 }
 
 
+<#
+.SYNOPSIS
+Show MariaDB connection command.
+.DESCRIPTION
+Prints the local DB connection command for the STIBS dev database.
+.EXAMPLE
+dm stibs_db
+#>
 function stibs_db {
     Write-Host "mariadb -h 127.0.0.1 -P 13306 -u stibs -pstibs stibs"
 }
 
 
+<#
+.SYNOPSIS
+Open a MariaDB shell in the dev container.
+.DESCRIPTION
+Runs docker compose exec mariadb with STIBS credentials.
+.EXAMPLE
+dm stibs_db_shell
+#>
 function stibs_db_shell {
     docker compose -f "$varStibsDockerPath\docker-compose.dev.yml" exec mariadb mariadb -u stibs -pstibs stibs
 }
 
 
+<#
+.SYNOPSIS
+Restart backend container in the dev stack.
+.DESCRIPTION
+Runs docker compose restart backend using docker-compose.dev.yml.
+.EXAMPLE
+dm stibs_dev_restart_backend
+#>
 function stibs_dev_restart_backend {
     docker compose -f "$varStibsDockerPath\docker-compose.dev.yml" restart backend
 }
 
 
+<#
+.SYNOPSIS
+Rebuild and start backend container in the dev stack.
+.DESCRIPTION
+Runs docker compose up -d --build backend using docker-compose.dev.yml.
+.EXAMPLE
+dm stibs_dev_rebuild_backend
+#>
 function stibs_dev_rebuild_backend {
     docker compose -f "$varStibsDockerPath\docker-compose.dev.yml" up -d --build backend
 }
