@@ -47,7 +47,7 @@ func runLegacy(args []string) int {
 	case "aliases", "config":
 		ui.PrintAliases(cfg)
 		return 0
-	case "profile", "ps_profile":
+	case "ps_profile":
 		return showPowerShellSymbols(resolveUserPowerShellProfilePath(), "$PROFILE")
 	case "cp":
 		if len(args) < 2 {
@@ -137,6 +137,9 @@ func runTargetOrSearch(baseDir string, cfg config.Config, args []string) int {
 		if err != nil {
 			if plugins.IsNotFound(err) {
 				fmt.Println("Error:", err)
+				if suggestion := suggestTopLevelName(baseDir, cfg, args[0]); suggestion != "" {
+					fmt.Printf("Did you mean: dm %s\n", suggestion)
+				}
 				return 1
 			}
 			fmt.Println("Error:", err)
@@ -476,9 +479,107 @@ func runPlugin(baseDir string, args []string) int {
 		}
 		return 0
 	default:
+		if suggestion := suggestClosest(args[0], []string{"list", "info", "run", "menu", "profile"}, 3); suggestion != "" {
+			fmt.Printf("Did you mean: dm plugins %s\n", suggestion)
+		}
 		fmt.Println("Usage: dm plugins <list|info|run|menu> ...")
 		return 0
 	}
+}
+
+func suggestTopLevelName(baseDir string, cfg config.Config, input string) string {
+	candidates := []string{
+		"aliases", "config", "ps_profile", "cp", "open", "list", "add", "validate", "plugins", "tools", "run",
+	}
+	for k := range cfg.Jump {
+		candidates = append(candidates, k)
+	}
+	for k := range cfg.Projects {
+		candidates = append(candidates, k)
+	}
+	if items, err := plugins.ListEntries(baseDir, true); err == nil {
+		for _, it := range items {
+			if strings.TrimSpace(it.Name) != "" {
+				candidates = append(candidates, it.Name)
+			}
+		}
+	}
+	return suggestClosest(input, candidates, 3)
+}
+
+func suggestClosest(input string, candidates []string, maxDistance int) string {
+	in := strings.ToLower(strings.TrimSpace(input))
+	if in == "" {
+		return ""
+	}
+	seen := map[string]struct{}{}
+	best := ""
+	bestDist := maxDistance + 1
+	for _, raw := range candidates {
+		c := strings.TrimSpace(raw)
+		if c == "" {
+			continue
+		}
+		key := strings.ToLower(c)
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		if key == in {
+			return c
+		}
+		d := editDistance(in, key)
+		if d < bestDist {
+			bestDist = d
+			best = c
+		}
+	}
+	if bestDist <= maxDistance {
+		return best
+	}
+	return ""
+}
+
+func editDistance(a, b string) int {
+	if a == b {
+		return 0
+	}
+	if len(a) == 0 {
+		return len(b)
+	}
+	if len(b) == 0 {
+		return len(a)
+	}
+	prev := make([]int, len(b)+1)
+	cur := make([]int, len(b)+1)
+	for j := 0; j <= len(b); j++ {
+		prev[j] = j
+	}
+	for i := 1; i <= len(a); i++ {
+		cur[0] = i
+		for j := 1; j <= len(b); j++ {
+			cost := 0
+			if a[i-1] != b[j-1] {
+				cost = 1
+			}
+			del := prev[j] + 1
+			ins := cur[j-1] + 1
+			sub := prev[j-1] + cost
+			cur[j] = min3(del, ins, sub)
+		}
+		prev, cur = cur, prev
+	}
+	return prev[len(b)]
+}
+
+func min3(a, b, c int) int {
+	if a <= b && a <= c {
+		return a
+	}
+	if b <= a && b <= c {
+		return b
+	}
+	return c
 }
 
 var psFunctionName = regexp.MustCompile(`(?i)^\s*function\s+([a-z0-9_-]+)\b`)

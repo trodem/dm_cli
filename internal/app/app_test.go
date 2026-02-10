@@ -96,3 +96,19 @@ func TestSplitMenuArgs(t *testing.T) {
 		t.Fatalf("expected %v, got %v", want, got)
 	}
 }
+
+func TestSuggestClosest(t *testing.T) {
+	candidates := []string{"plugins", "tools", "open"}
+	got := suggestClosest("plguins", candidates, 3)
+	if got != "plugins" {
+		t.Fatalf("expected plugins, got %q", got)
+	}
+}
+
+func TestSuggestClosestNoMatch(t *testing.T) {
+	candidates := []string{"plugins", "tools", "open"}
+	got := suggestClosest("xyz", candidates, 2)
+	if got != "" {
+		t.Fatalf("expected empty suggestion, got %q", got)
+	}
+}

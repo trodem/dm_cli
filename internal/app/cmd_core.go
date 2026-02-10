@@ -2,7 +2,9 @@ package app
 
 import (
 	"fmt"
+	"strings"
 
+	"cli/internal/plugins"
 	"cli/internal/runner"
 	"cli/internal/ui"
 	"cli/tools"
@@ -40,9 +42,8 @@ func addCobraSubcommands(root *cobra.Command, opts *flags) {
 		},
 	})
 	root.AddCommand(&cobra.Command{
-		Use:     "ps_profile",
-		Aliases: []string{"profile"},
-		Short:   "Show functions and aliases from PowerShell $PROFILE",
+		Use:   "ps_profile",
+		Short: "Show functions and aliases from PowerShell $PROFILE",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			code := showPowerShellSymbols(resolveUserPowerShellProfilePath(), "$PROFILE")
@@ -64,6 +65,9 @@ func addCobraSubcommands(root *cobra.Command, opts *flags) {
 		Use:   "profile",
 		Short: "Overwrite PowerShell $PROFILE from plugins/functions/0_powershell_profile.ps1",
 		Args:  cobra.NoArgs,
+		ValidArgs: []string{
+			"profile",
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			rt, err := loadRuntime(*opts)
 			if err != nil {
@@ -89,6 +93,9 @@ func addCobraSubcommands(root *cobra.Command, opts *flags) {
 		Use:   "ps_profile",
 		Short: "Open PowerShell $PROFILE in Notepad",
 		Args:  cobra.NoArgs,
+		ValidArgs: []string{
+			"ps_profile",
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return openUserPowerShellProfileInNotepad()
 		},
@@ -98,6 +105,9 @@ func addCobraSubcommands(root *cobra.Command, opts *flags) {
 		Aliases: []string{"profile-source", "profile-src"},
 		Short:   "Open plugins/functions/0_powershell_profile.ps1 in Notepad",
 		Args:    cobra.NoArgs,
+		ValidArgs: []string{
+			"profile",
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			rt, err := loadRuntime(*opts)
 			if err != nil {
@@ -226,6 +236,7 @@ func newPluginCommand(opts *flags) *cobra.Command {
 		Use:   "info <name>",
 		Short: "Show plugin/function details",
 		Args:  cobra.ExactArgs(1),
+		ValidArgsFunction: completePluginEntryNames(opts),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runPluginArgs("info", args[0])
 		},
@@ -242,6 +253,7 @@ func newPluginCommand(opts *flags) *cobra.Command {
 		Use:   "run <name> [args...]",
 		Short: "Run a plugin",
 		Args:  cobra.MinimumNArgs(1),
+		ValidArgsFunction: completePluginEntryNames(opts),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			out := append([]string{"run"}, args...)
 			return runPluginArgs(out...)
@@ -249,6 +261,31 @@ func newPluginCommand(opts *flags) *cobra.Command {
 	})
 
 	return pluginCmd
+}
+
+func completePluginEntryNames(opts *flags) func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
+	return func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		rt, err := loadRuntime(*opts)
+		if err != nil {
+			return nil, cobra.ShellCompDirectiveNoFileComp
+		}
+		items, err := plugins.ListEntries(rt.BaseDir, true)
+		if err != nil {
+			return nil, cobra.ShellCompDirectiveNoFileComp
+		}
+		prefix := strings.ToLower(strings.TrimSpace(toComplete))
+		out := make([]string, 0, len(items))
+		for _, it := range items {
+			name := strings.TrimSpace(it.Name)
+			if name == "" {
+				continue
+			}
+			if prefix == "" || strings.HasPrefix(strings.ToLower(name), prefix) {
+				out = append(out, name)
+			}
+		}
+		return out, cobra.ShellCompDirectiveNoFileComp
+	}
 }
 
 func newToolsCommand(opts *flags) *cobra.Command {

@@ -95,7 +95,28 @@ try {
     }
 
     Write-Host "==> Packaging $zipPath"
-    Compress-Archive -Path (Join-Path $stageDir "*") -DestinationPath $zipPath
+    $packaged = $false
+    $lastErr = $null
+    for ($attempt = 1; $attempt -le 5; $attempt++) {
+      try {
+        Compress-Archive -Path (Join-Path $stageDir "*") -DestinationPath $zipPath
+        $packaged = $true
+        break
+      } catch {
+        $lastErr = $_
+        if ($attempt -lt 5) {
+          $delay = 2 * $attempt
+          Write-Host "Packaging retry $attempt/5 failed, waiting $delay seconds..."
+          Start-Sleep -Seconds $delay
+          if (Test-Path $zipPath) {
+            Remove-Item -Force $zipPath -ErrorAction SilentlyContinue
+          }
+        }
+      }
+    }
+    if (-not $packaged) {
+      throw $lastErr
+    }
 
     $hash = (Get-FileHash -Algorithm SHA256 $zipPath).Hash.ToLower()
     $hashPath = "$zipPath.sha256"
