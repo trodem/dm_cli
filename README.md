@@ -321,7 +321,7 @@ Interactive plugin menu:
   - select plugin file by number/letter
   - then select function by number/letter
   - `h <n|letter>` shows function help
-  - `b` goes back, `q` exits
+  - `x` exits (from function list it goes back; from file list it closes the menu)
 
 For cross-shell use, provide both plugin variants when needed:
 - `plugins/<name>.ps1` for PowerShell

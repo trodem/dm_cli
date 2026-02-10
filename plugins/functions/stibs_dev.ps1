@@ -1,30 +1,41 @@
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
+$varStibsDockerPath = "C:\Users\trodem\Documents\01_Development\50_STIBS\stibs-mono\stibs\docker"
+$varStibsMonoPath   = "C:\Users\trodem\Documents\01_Development\50_STIBS\stibs-mono"
+
+$composeFile = Join-Path $varStibsDockerPath "docker-compose.dev.yml"
+
+function _dc {
+    docker compose -f $composeFile @args
+}
+
 <#
 .SYNOPSIS
 Show backend container logs.
 .DESCRIPTION
-Prints the last 50 lines from docker-backend-1.
+Prints the last 50 lines from the backend service.
 .EXAMPLE
 dm stibs_logs_backend
 #>
 function stibs_logs_backend {
     _assert_command_available -Name docker
-    docker logs --tail 50 docker-backend-1
+    _assert_path_exists -Path $composeFile
+    _dc logs --tail 50 backend
 }
 
 <#
 .SYNOPSIS
 Show frontend container logs.
 .DESCRIPTION
-Prints the last 50 lines from docker-frontend-1.
+Prints the last 50 lines from the frontend service.
 .EXAMPLE
 dm stibs_logs_frontend
 #>
 function stibs_logs_frontend {
     _assert_command_available -Name docker
-    docker logs --tail 50 docker-frontend-1
+    _assert_path_exists -Path $composeFile
+    _dc logs --tail 50 frontend
 }
 
 <#
@@ -37,8 +48,8 @@ dm stibs_dev_up
 #>
 function stibs_dev_up {
     _assert_command_available -Name docker
-    _assert_path_exists -Path $varStibsDockerPath
-    docker compose -f "$varStibsDockerPath\docker-compose.dev.yml" up
+    _assert_path_exists -Path $composeFile
+    _dc up -d
 }
 
 <#
@@ -51,8 +62,8 @@ dm stibs_dev_down
 #>
 function stibs_dev_down {
     _assert_command_available -Name docker
-    _assert_path_exists -Path $varStibsDockerPath
-    docker compose -f "$varStibsDockerPath\docker-compose.dev.yml" down
+    _assert_path_exists -Path $composeFile
+    _dc down
 }
 
 <#
@@ -77,8 +88,8 @@ dm stibs_db_shell
 #>
 function stibs_db_shell {
     _assert_command_available -Name docker
-    _assert_path_exists -Path $varStibsDockerPath
-    docker compose -f "$varStibsDockerPath\docker-compose.dev.yml" exec mariadb mariadb -u stibs -pstibs stibs
+    _assert_path_exists -Path $composeFile
+    _dc exec mariadb mariadb -u stibs -pstibs stibs
 }
 
 <#
@@ -91,8 +102,8 @@ dm stibs_dev_restart_backend
 #>
 function stibs_dev_restart_backend {
     _assert_command_available -Name docker
-    _assert_path_exists -Path $varStibsDockerPath
-    docker compose -f "$varStibsDockerPath\docker-compose.dev.yml" restart backend
+    _assert_path_exists -Path $composeFile
+    _dc restart backend
 }
 
 <#
@@ -105,6 +116,33 @@ dm stibs_dev_rebuild_backend
 #>
 function stibs_dev_rebuild_backend {
     _assert_command_available -Name docker
-    _assert_path_exists -Path $varStibsDockerPath
-    docker compose -f "$varStibsDockerPath\docker-compose.dev.yml" up -d --build backend
+    _assert_path_exists -Path $composeFile
+    _dc up -d --build backend
+}
+
+<#
+.SYNOPSIS
+Show status of STIBS development stack.
+.DESCRIPTION
+Displays docker compose ps for the dev stack.
+.EXAMPLE
+dm stibs_status
+#>
+function stibs_status {
+    _assert_command_available -Name docker
+    _assert_path_exists -Path $composeFile
+    _dc ps
+}
+
+<#
+.SYNOPSIS
+Change directory to STIBS local path.
+.DESCRIPTION
+Moves shell location to $varStibsMonoPath.
+.EXAMPLE
+dm stibs
+#>
+function stibs {
+    _assert_path_exists -Path $varStibsMonoPath
+    Set-Location $varStibsMonoPath
 }

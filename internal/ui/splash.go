@@ -15,34 +15,36 @@ type SplashData struct {
 }
 
 func PrintSplash(d SplashData) {
-	fmt.Println(strings.TrimRight(logoText, "\n"))
-	fmt.Println("dm - Demtrodev CLI")
+	fmt.Println(Accent(strings.TrimRight(logoText, "\n")))
+	fmt.Println(Accent("dm - Demtrodev CLI"))
 	fmt.Println()
-	fmt.Println("Project Info")
-	fmt.Println("------------")
-	fmt.Printf("Base dir   : %s\n", d.BaseDir)
-	fmt.Printf("Packs      : %d\n", d.PackCount)
+	fmt.Println(Accent("Workspace"))
+	fmt.Println(Muted("---------"))
+	fmt.Printf("%s %s\n", Muted("Base dir   :"), d.BaseDir)
+	fmt.Printf("%s %d\n", Muted("Packs      :"), d.PackCount)
 	if d.ActivePack != "" {
-		fmt.Printf("Active pack: %s\n", d.ActivePack)
+		fmt.Printf("%s %s\n", Muted("Active pack:"), d.ActivePack)
 	} else {
-		fmt.Printf("Active pack: none\n")
+		fmt.Printf("%s %s\n", Muted("Active pack:"), Warn("none"))
 	}
 	if d.ConfigUsed {
-		fmt.Printf("Config     : %s\n", d.ConfigPath)
+		fmt.Printf("%s %s\n", Muted("Config     :"), d.ConfigPath)
 	} else {
-		fmt.Printf("Config     : default (packs/*/pack.json)\n")
+		fmt.Printf("%s %s\n", Muted("Config     :"), "default (packs/*/pack.json)")
 	}
 	fmt.Println()
-	fmt.Println("Quick Start")
-	fmt.Println("-----------")
-	fmt.Println("dm help")
-	fmt.Println("dm pack list")
-	fmt.Println("dm pack use <name>")
-	fmt.Println("dm tools")
-	fmt.Println("dm -t s")
-	fmt.Println("dm -k list")
-	fmt.Println("dm -g list")
-	fmt.Println("dm completion install")
+	fmt.Println(Accent("Quick Start"))
+	fmt.Println(Muted("-----------"))
+	fmt.Println(Prompt("dm help"))
+	fmt.Println(Prompt("dm pack list"))
+	fmt.Println(Prompt("dm pack current"))
+	fmt.Println(Prompt("dm pack use <name>"))
+	fmt.Println(Prompt("dm tools"))
+	fmt.Println(Prompt("dm -t s"))
+	fmt.Println(Prompt("dm -k list"))
+	fmt.Println(Prompt("dm -g"))
+	fmt.Println(Prompt("dm plugin list"))
+	fmt.Println(Prompt("dm completion install"))
 }
 
 //go:embed logo.txt

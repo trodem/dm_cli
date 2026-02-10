@@ -523,7 +523,7 @@ func runPluginMenu(baseDir string) int {
 		fmt.Println(" 0) " + ui.Error("[x] Exit"))
 		fmt.Print(ui.Prompt("Select file > "))
 		choice := strings.TrimSpace(readLine(reader))
-		if choice == "" || strings.EqualFold(choice, "x") || choice == "0" || strings.EqualFold(choice, "q") {
+		if choice == "" || strings.EqualFold(choice, "x") || choice == "0" {
 			return 0
 		}
 		fileIndex, ok := parsePluginMenuChoice(choice, len(files))
@@ -561,17 +561,14 @@ func runPluginFunctionsMenu(baseDir string, file plugins.FunctionFile, reader *b
 			}
 			fmt.Println(line)
 		}
-		fmt.Println(" b) Back")
-		fmt.Println(" q) Quit")
+		fmt.Println(" 0) " + ui.Error("[x] Exit"))
 		fmt.Println(ui.Muted(" h <n|letter>) Help"))
 		fmt.Print(ui.Prompt("Select function > "))
 
 		choice := strings.TrimSpace(readLine(reader))
 		lc := strings.ToLower(choice)
 		switch lc {
-		case "", "b", "back":
-			return 0
-		case "q", "quit", "x", "exit":
+		case "", "0", "x", "exit":
 			return 0
 		}
 
