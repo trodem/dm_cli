@@ -19,9 +19,9 @@ type toolMenuItem struct {
 var toolMenuItems = []toolMenuItem{
 	{Key: "s", Name: "search", Synopsis: "Search files by name/extension"},
 	{Key: "r", Name: "rename", Synopsis: "Batch rename files with preview"},
-	{Key: "n", Name: "note", Synopsis: "Append a quick note to pack inbox"},
+	{Key: "n", Name: "note", Synopsis: "Append a quick note to a file"},
 	{Key: "e", Name: "recent", Synopsis: "Show recent files"},
-	{Key: "b", Name: "backup", Synopsis: "Create a pack zip backup"},
+	{Key: "b", Name: "backup", Synopsis: "Create a folder zip backup"},
 	{Key: "c", Name: "clean", Synopsis: "Delete empty folders"},
 	{Key: "y", Name: "system", Synopsis: "Show system/network snapshot"},
 }

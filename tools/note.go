@@ -7,28 +7,18 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
-
-	"cli/internal/store"
 )
 
 func RunQuickNote(baseDir string, r *bufio.Reader) int {
-	active, _ := store.GetActivePack(baseDir)
-	pack := prompt(r, "Pack name", active)
-	if strings.TrimSpace(pack) == "" {
-		fmt.Println("Error: pack name is required.")
-		return 1
-	}
-	if !store.PackExists(baseDir, pack) {
-		fmt.Println("Error: pack not found.")
-		return 1
-	}
+	defaultPath := filepath.Join(currentWorkingDir(baseDir), "inbox.md")
+	notePath := prompt(r, "Note file", defaultPath)
+	notePath = normalizeInputPath(notePath, defaultPath)
 	text := prompt(r, "Note", "")
 	if strings.TrimSpace(text) == "" {
 		fmt.Println("Error: note is empty.")
 		return 1
 	}
 
-	notePath := filepath.Join(baseDir, "packs", pack, "knowledge", "inbox.md")
 	if err := os.MkdirAll(filepath.Dir(notePath), 0755); err != nil {
 		fmt.Println("Error:", err)
 		return 1

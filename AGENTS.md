@@ -14,8 +14,7 @@ Repository guidelines for automated agents.
 - CLI command wiring: `internal/app/` (Cobra-based)
 - Config files:
   - `dm.json` (optional root includes)
-  - `packs/*/pack.json`
-  - `packs/*/knowledge/`
+  - `config/*.json` (optional included fragments)
 - Plugin files:
   - `plugins/variables.ps1` (shared variables + private helper functions)
   - `plugins/functions/*.ps1` (public command functions)
@@ -28,9 +27,7 @@ Repository guidelines for automated agents.
 
 ## Config Rules
 - Use `include` in `dm.json` for scale.
-- Split by domain using packs:
-  - `packs/<name>/pack.json`
-  - `packs/<name>/knowledge/`
+- Split by domain using included config fragments (for example `config/work.json`, `config/home.json`).
 - Keep paths either absolute or relative to the executable directory.
 
 ## Testing
@@ -42,26 +39,25 @@ Repository guidelines for automated agents.
 - Keep command docs in Cobra metadata (`Use`, `Short`, `Long`, `Example`).
 - Keep group shortcuts aligned across legacy/Cobra parsing:
   - `-t` / `--tools` -> `tools`
-  - `-k` / `--packs` -> `pack`
-  - `-g` / `--plugins` -> `plugin`
+  - `-p` / `--plugins` -> `plugins`
 - Tools should be invocable both as:
   - `dm tools <name>`
   - `dm -t <name>`
 - Keep tool aliases consistent (`search/s`, `rename/r`, `note/n`, `recent/rec`, `backup/b`, `clean/c`).
 - For tools that request `Base path`, default to current working directory.
 - Plugin menu UX:
-  - `dm -g` / `dm plugin` should open the interactive plugin menu.
+  - `dm -p` / `dm plugins` should open the interactive plugin menu.
   - Keep plugin navigation two-level:
     1. plugin file selection
     2. function selection inside the chosen file
   - Support both number and letter shortcuts in plugin menu selections.
-  - Keep `h <n|letter>` for function help, `b` for back, `q` for quit.
+  - Keep `h <n|letter>` for function help and `x` for exit/back.
   - After function execution/help in menu, pause with an explicit "press enter to continue" prompt.
 - Keep legacy plugin commands working:
-  - `dm plugin list`
-  - `dm plugin list --functions`
-  - `dm plugin info <name>`
-  - `dm plugin run <name> [args...]`
+  - `dm plugins list`
+  - `dm plugins list --functions`
+  - `dm plugins info <name>`
+  - `dm plugins run <name> [args...]`
 
 ## PowerShell Plugin Conventions
 - Store public PowerShell plugin commands in `plugins/functions/*.ps1`.

@@ -14,10 +14,6 @@ type Issue struct {
 func Validate(cfg Config) []Issue {
 	var issues []Issue
 
-	if strings.TrimSpace(cfg.Search.Knowledge) == "" {
-		issues = append(issues, Issue{Level: "warn", Message: "search.knowledge is empty"})
-	}
-
 	for k, v := range cfg.Jump {
 		if strings.TrimSpace(k) == "" {
 			issues = append(issues, Issue{Level: "error", Message: "jump key is empty"})

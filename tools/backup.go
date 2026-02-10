@@ -9,19 +9,14 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
-
-	"cli/internal/store"
 )
 
 func RunPackBackup(baseDir string, r *bufio.Reader) int {
-	active, _ := store.GetActivePack(baseDir)
-	pack := prompt(r, "Pack name", active)
-	if strings.TrimSpace(pack) == "" {
-		fmt.Println("Error: pack name is required.")
-		return 1
-	}
-	if !store.PackExists(baseDir, pack) {
-		fmt.Println("Error: pack not found.")
+	defaultSource := currentWorkingDir(baseDir)
+	sourceDir := prompt(r, "Source dir", defaultSource)
+	sourceDir = normalizeInputPath(sourceDir, defaultSource)
+	if err := validateExistingDir(sourceDir, "source dir"); err != nil {
+		fmt.Println("Error:", err)
 		return 1
 	}
 
@@ -36,10 +31,13 @@ func RunPackBackup(baseDir string, r *bufio.Reader) int {
 	}
 
 	ts := time.Now().Format("20060102-1504")
-	outPath := filepath.Join(outDir, fmt.Sprintf("pack-%s-%s.zip", pack, ts))
-	packDir := filepath.Join(baseDir, "packs", pack)
+	baseName := filepath.Base(sourceDir)
+	if baseName == "" || baseName == "." || baseName == string(filepath.Separator) {
+		baseName = "backup"
+	}
+	outPath := filepath.Join(outDir, fmt.Sprintf("%s-%s.zip", baseName, ts))
 
-	if err := zipDir(packDir, outPath); err != nil {
+	if err := zipDir(sourceDir, outPath); err != nil {
 		fmt.Println("Error:", err)
 		return 1
 	}

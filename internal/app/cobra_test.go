@@ -27,16 +27,16 @@ func TestRewriteGroupShortcutsToolsWithTarget(t *testing.T) {
 }
 
 func TestRewriteGroupShortcutsMixedArgs(t *testing.T) {
-	got := rewriteGroupShortcuts([]string{"-p", "git", "-t", "search"})
-	want := []string{"-p", "git", "tools", "search"}
+	got := rewriteGroupShortcuts([]string{"--profile", "work", "-t", "search"})
+	want := []string{"--profile", "work", "tools", "search"}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("expected %v, got %v", want, got)
 	}
 }
 
-func TestRewriteGroupShortcutsPackAndPlugin(t *testing.T) {
-	got := rewriteGroupShortcuts([]string{"-k", "list", "-g", "run"})
-	want := []string{"pack", "list", "plugin", "run"}
+func TestRewriteGroupShortcutsPlugin(t *testing.T) {
+	got := rewriteGroupShortcuts([]string{"-p", "run"})
+	want := []string{"plugins", "run"}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("expected %v, got %v", want, got)
 	}

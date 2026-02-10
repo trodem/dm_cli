@@ -6,10 +6,8 @@ func mapGroupShortcut(arg string) (string, bool) {
 	switch arg {
 	case "-t", "--tools":
 		return "tools", true
-	case "-k", "--packs":
-		return "pack", true
-	case "-g", "--plugins":
-		return "plugin", true
+	case "-p", "--plugins":
+		return "plugins", true
 	default:
 		return "", false
 	}

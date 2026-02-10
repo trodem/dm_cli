@@ -23,28 +23,20 @@ func TestParseFlagsToolsShortcutWithTarget(t *testing.T) {
 	}
 }
 
-func TestParseFlagsToolsShortcutWithAliasAndPack(t *testing.T) {
-	f, out := parseFlags([]string{"-p", "git", "-t", "s"})
+func TestParseFlagsToolsShortcutWithUnrelatedFlags(t *testing.T) {
+	f, out := parseFlags([]string{"--profile", "work", "-t", "s"})
 	want := []string{"tools", "s"}
-	if f.Pack != "git" {
-		t.Fatalf("expected pack git, got %q", f.Pack)
+	if f.Profile != "work" {
+		t.Fatalf("expected profile work, got %q", f.Profile)
 	}
-	if !reflect.DeepEqual(out, want) {
-		t.Fatalf("expected %v, got %v", want, out)
-	}
-}
-
-func TestParseFlagsPacksShortcut(t *testing.T) {
-	_, out := parseFlags([]string{"-k", "list"})
-	want := []string{"pack", "list"}
 	if !reflect.DeepEqual(out, want) {
 		t.Fatalf("expected %v, got %v", want, out)
 	}
 }
 
 func TestParseFlagsPluginsShortcut(t *testing.T) {
-	_, out := parseFlags([]string{"-g", "list"})
-	want := []string{"plugin", "list"}
+	_, out := parseFlags([]string{"-p", "list"})
+	want := []string{"plugins", "list"}
 	if !reflect.DeepEqual(out, want) {
 		t.Fatalf("expected %v, got %v", want, out)
 	}

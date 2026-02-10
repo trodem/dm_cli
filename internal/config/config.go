@@ -5,7 +5,6 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
-	"strings"
 )
 
 type Config struct {
@@ -34,7 +33,6 @@ type Profile struct {
 type Options struct {
 	Profile  string
 	UseCache bool
-	Pack     string
 }
 
 type CacheFile struct {
@@ -48,7 +46,7 @@ func Load(path string, opts Options) (Config, error) {
 	baseCfg, err := loadFile(path)
 	if err != nil {
 		if os.IsNotExist(err) {
-			baseCfg = Config{Include: []string{filepath.Join("packs", "*", "pack.json")}}
+			baseCfg = Config{}
 		} else {
 			return baseCfg, err
 		}
@@ -56,10 +54,6 @@ func Load(path string, opts Options) (Config, error) {
 
 	if opts.Profile != "" {
 		applyProfile(&baseCfg, opts.Profile)
-	}
-
-	if opts.Pack != "" {
-		baseCfg.Include = []string{filepath.Join("packs", opts.Pack, "pack.json")}
 	}
 
 	sources, err := collectSources(path, baseCfg.Include, baseDir)
@@ -83,7 +77,6 @@ func Load(path string, opts Options) (Config, error) {
 	}
 
 	normalize(&cfg)
-	applyPackDefaults(&cfg, opts.Pack)
 
 	if opts.UseCache {
 		cachePath := cacheFilePath(baseDir, opts.Profile)
@@ -149,15 +142,6 @@ func applyProfile(cfg *Config, name string) {
 	}
 	if p.Search.Knowledge != "" {
 		cfg.Search.Knowledge = p.Search.Knowledge
-	}
-}
-
-func applyPackDefaults(cfg *Config, pack string) {
-	if pack == "" {
-		return
-	}
-	if strings.TrimSpace(cfg.Search.Knowledge) == "" {
-		cfg.Search.Knowledge = filepath.Join("packs", pack, "knowledge")
 	}
 }
 

@@ -1,67 +1,15 @@
 {
   "sources": {
-    "E:\\SynologyDrive\\5_Demtrodev_Knowledge\\dm.json": 1770470106029539000,
-    "E:\\SynologyDrive\\5_Demtrodev_Knowledge\\packs\\base\\pack.json": 1770577362775266000,
-    "E:\\SynologyDrive\\5_Demtrodev_Knowledge\\packs\\docker\\pack.json": 1770577362776269500,
-    "E:\\SynologyDrive\\5_Demtrodev_Knowledge\\packs\\git\\pack.json": 1770577362776269500,
-    "E:\\SynologyDrive\\5_Demtrodev_Knowledge\\packs\\vim\\pack.json": 1770577362776269500
+    "E:\\SynologyDrive\\5_Demtrodev_Knowledge\\dm.json": 1770740364495256200
   },
   "config": {
     "jump": {},
-    "run": {
-      "dcd": "docker compose down",
-      "dclogs": "docker compose logs -f",
-      "dcps": "docker compose ps",
-      "dcu": "docker compose up -d",
-      "dexec": "docker exec -it",
-      "dimg": "docker images",
-      "dlogs": "docker logs -f",
-      "dnet": "docker network ls",
-      "dprune": "docker system prune -af",
-      "dps": "docker ps",
-      "dpsa": "docker ps -a",
-      "drm": "docker rm",
-      "drmi": "docker rmi",
-      "dstop": "docker stop $(docker ps -q)",
-      "dvol": "docker volume ls",
-      "gbr": "git branch",
-      "gcl": "git clone",
-      "gco": "git checkout",
-      "gcommit": "git add . \u0026\u0026 git commit",
-      "gl": "git log --oneline --graph --decorate",
-      "gpl": "git pull",
-      "gps": "git push",
-      "gs": "git status",
-      "gss": "git status -s",
-      "gst": "git stash",
-      "gsta": "git stash apply",
-      "nvim": "nvim",
-      "nvim-version": "nvim --version",
-      "vim": "vim",
-      "vim-version": "vim --version",
-      "vimtutor": "vimtutor"
-    },
-    "projects": {
-      "git-tools": {
-        "path": "projects/git-tools",
-        "commands": {
-          "authors": "git shortlog -sn",
-          "changelog": "git log --pretty=format:\"%h %ad %s\" --date=short",
-          "graph": "git log --oneline --graph --decorate --all",
-          "last-10": "git log -10 --oneline",
-          "prune-merged": "for /f \"tokens=*\" %i in ('git branch --merged ^| findstr /v /c:\"*\" /c:\"main\" /c:\"master\"') do git branch -d %i",
-          "status": "git status",
-          "sync": "git fetch --all --prune",
-          "tags": "git tag -n"
-        }
-      }
-    },
+    "run": {},
+    "projects": {},
     "search": {
-      "knowledge": "packs/vim/knowledge"
+      "knowledge": ""
     },
-    "include": [
-      "packs/*/pack.json"
-    ],
+    "include": null,
     "profiles": null
   }
 }

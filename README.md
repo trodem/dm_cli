@@ -1,6 +1,6 @@
 # dm
 
-Small personal CLI to jump to folders, run project commands, and search a knowledge base.
+Small personal CLI to jump to folders and run project commands.
 
 ## Index
 - [Features](#features)
@@ -9,7 +9,6 @@ Small personal CLI to jump to folders, run project commands, and search a knowle
 - [Configuration](#configuration)
 - [Usage](#usage)
 - [Project Actions](#project-actions)
-- [Search](#search)
 - [Plugins](#plugins)
 - [Tools](#tools)
 - [Help](#help)
@@ -20,7 +19,6 @@ Small personal CLI to jump to folders, run project commands, and search a knowle
 - Jump to paths from aliases
 - Run global aliases
 - Run project actions
-- Search markdown notes
 - Interactive menu for targets
 - Config splitting with includes and profiles
 - Plugins (scripts) support
@@ -54,37 +52,13 @@ Each artifact folder/zip includes:
 - `LICENSE` (if present)
 
 ## Configuration
-`dm` works without a config file. By default it loads:
-`packs/*/pack.json`
+`dm` works without a config file. If `dm.json` is missing, CLI starts with an empty config.
 
 If you want custom includes or profiles, create `dm.json`.
 
-### Packs (recommended)
-Each pack is a folder that contains everything for a domain/project:
-```
-packs/<name>/pack.json
-packs/<name>/knowledge/
-```
-
-### Pack Explained (simple)
-Think of a pack as a box with 4 things:
-
-- `jump`: shortcuts to folders
-- `run`: buttons to run commands
-- `projects`: projects with their commands
-- `search`: where to search notes
-
-Example:
+Example `dm.json`:
 ```json
 {
-  "schema_version": 1,
-  "description": "Git workflows and notes",
-  "summary": "Git aliases and project actions",
-  "tags": ["git", "vcs"],
-  "examples": [
-    "dm -p git find rebase",
-    "dm -p git run gs"
-  ],
   "jump": { "api": "projects/api" },
   "run": { "gs": "git status" },
   "projects": {
@@ -92,8 +66,7 @@ Example:
       "path": "projects/git-tools",
       "commands": { "gcommit": "git add . && git commit" }
     }
-  },
-  "search": { "knowledge": "packs/git/knowledge" }
+  }
 }
 ```
 
@@ -102,31 +75,6 @@ Usage:
 dm api
 dm run gs
 dm git-tools gcommit
-dm -p git find branch
-```
-
-Optional `dm.json` example:
-```json
-{
-  "include": ["packs/*/pack.json"]
-}
-```
-
-Example `packs/docker/pack.json`:
-```json
-{
-  "jump": { "docker": "E:/tools/docker" },
-  "run": { "dps": "docker ps" },
-  "projects": {
-    "docker": {
-      "path": "E:/projects/docker",
-      "commands": {
-        "up": "docker compose up -d"
-      }
-    }
-  },
-  "search": { "knowledge": "packs/docker/knowledge" }
-}
 ```
 
 Notes:
@@ -134,17 +82,16 @@ Notes:
 - Forward slashes are supported on Windows (`E:/...`).
 
 ### Split Config (includes)
-You can include packs (or any config files) using `include` patterns.
+You can include config files using `include` patterns.
 
 ### Profiles
-Define profile-specific includes and optional search overrides:
+Define profile-specific includes:
 ```json
 {
-  "include": ["packs/*/pack.json"],
+  "include": ["config/*.json"],
   "profiles": {
     "work": {
-      "include": ["packs/work/pack.json"],
-      "search": { "knowledge": "packs/work/knowledge" }
+      "include": ["config/work.json"]
     }
   }
 }
@@ -169,53 +116,31 @@ dm --no-cache list jumps
 ```bash
 dm help
 dm aliases
-dm --pack docker list jumps
-dm -p docker list jumps
 dm list jumps
 dm add jump <name> <path>
-dm --pack docker add jump <name> <path>
-dm pack new <name>
-dm pack new <name> --description "..."
-dm pack clone <src> <dst>
-dm pack edit <name> --summary "..." --tag dev --example "dm -p <name> find <query>"
-dm pack list
-dm pack list --verbose
-dm pack info <name>
-dm pack doctor <name>
-dm pack doctor <name> --json
-dm pack use <name>
-dm pack current
-dm pack unset
 dm validate
-dm plugin list
-dm plugin list --functions
-dm plugin info <name>
-dm plugin menu
-dm plugin run <name> [args...]
+dm plugins list
+dm plugins list --functions
+dm plugins info <name>
+dm plugins menu
+dm plugins run <name> [args...]
 dm <plugin> [args...]
 dm run <alias>
-dm find <query>
 dm tools
 dm tools <tool>
 dm -t [tool]
-dm -k [cmd]
-dm -k <pack> <cmd...>
-dm -g [cmd]
+dm -p [cmd]
 dm <project> <action>
 dm <name>
 ```
 
 Notes:
-- Use `-p <pack>` or set a default pack with `dm pack use <name>`.
 - Group shortcuts:
   - `-t` / `--tools` => `tools`
-  - `-k` / `--packs` => `pack`
-  - `-g` / `--plugins` => `plugin`
-- Pack profile shortcut:
-  - `dm -k <pack> <cmd...>` runs `<cmd...>` with `--pack <pack>` (example: `dm -k vim run vim`).
+  - `-p` / `--plugins` => `plugins`
 - Fallback dispatch:
   - `dm <name>` now tries `jump/project` first, then direct plugin execution.
-  - If no plugin exists, `dm` returns an error (it does not auto-run search).
+  - If no plugin exists, `dm` returns an error.
 
 Interactive target:
 ```bash
@@ -231,16 +156,8 @@ Example:
 dm app test
 ```
 
-## Search
-Searches all `.md` files under `search.knowledge`:
-```bash
-dm find golang
-```
-If `rg` (ripgrep) is installed, it is used automatically for faster search.
-If you use packs, pass `--pack <name>` so search uses that pack knowledge folder.
-
 ## Tools
-Interactive menu for file search, rename, quick notes, recent files, pack backup, clean empty folders, and system snapshot:
+Interactive menu for file search, rename, quick notes, recent files, folder backup, clean empty folders, and system snapshot:
 ```bash
 dm tools
 dm -t
@@ -268,9 +185,7 @@ Global:
 ```bash
 dm help
 dm help tools
-dm help plugin
-dm pack --help
-dm pack <name> --help
+dm help plugins
 ```
 
 Shell completion (PowerShell):
@@ -307,17 +222,17 @@ Recommended layout:
 
 Run:
 ```bash
-dm -g
-dm plugin list
-dm plugin list --functions
-dm plugin info <name>
-dm plugin menu
-dm plugin run <name> [args...]
+dm -p
+dm plugins list
+dm plugins list --functions
+dm plugins info <name>
+dm plugins menu
+dm plugins run <name> [args...]
 dm <name> [args...]
 ```
 
 Interactive plugin menu:
-- `dm -g` (or `dm plugin`) opens a 2-level menu:
+- `dm -p` (or `dm plugins`) opens a 2-level menu:
   - select plugin file by number/letter
   - then select function by number/letter
   - `h <n|letter>` shows function help
@@ -338,7 +253,6 @@ PowerShell profile function bridge:
 .
 |-- .github/workflows/ci.yml
 |-- main.go
-|-- packs
 |-- plugins
 |   |-- variables.ps1
 |   `-- functions
@@ -350,9 +264,7 @@ PowerShell profile function bridge:
     |-- plugins
     |-- platform
     |-- runner
-    |-- search
     |-- systeminfo
-    |-- store
     `-- ui
 ```
 
@@ -360,5 +272,5 @@ PowerShell profile function bridge:
 - Unreleased: Start incremental migration to Cobra for CLI parsing while keeping legacy behavior and adding completion install for powershell/bash/zsh/fish.
 - Unreleased: Add split config support via `include` and package refactor into `internal/`.
 - Unreleased: Add profiles, plugins, cache, validation, and add/list commands.
-- Unreleased: Add packs with per-pack knowledge.
+- Unreleased: Consolidate configuration around `dm.json` + plugins/tools.
 - v0.1.0: Initial public version.

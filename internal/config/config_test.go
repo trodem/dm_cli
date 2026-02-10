@@ -9,15 +9,21 @@ import (
 func TestLoadWithInclude(t *testing.T) {
 	dir := t.TempDir()
 
-	if err := os.MkdirAll(filepath.Join(dir, "packs", "base"), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Join(dir, "cfg"), 0755); err != nil {
 		t.Fatal(err)
 	}
-	packCfg := `{
+	mainCfg := `{
+  "include": ["cfg/base.json"]
+}`
+	if err := os.WriteFile(filepath.Join(dir, "dm.json"), []byte(mainCfg), 0644); err != nil {
+		t.Fatal(err)
+	}
+	includeCfg := `{
   "jump": {"dev": "E:/dev"},
   "run": {"gs": "git status"},
-  "search": { "knowledge": "packs/base/knowledge" }
+  "search": { "knowledge": "knowledge" }
 }`
-	if err := os.WriteFile(filepath.Join(dir, "packs", "base", "pack.json"), []byte(packCfg), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "cfg", "base.json"), []byte(includeCfg), 0644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -31,7 +37,7 @@ func TestLoadWithInclude(t *testing.T) {
 	if cfg.Run["gs"] != "git status" {
 		t.Fatalf("expected run gs, got %v", cfg.Run["gs"])
 	}
-	if cfg.Search.Knowledge != "packs/base/knowledge" {
+	if cfg.Search.Knowledge != "knowledge" {
 		t.Fatalf("expected knowledge, got %v", cfg.Search.Knowledge)
 	}
 }
@@ -40,26 +46,23 @@ func TestLoadWithProfile(t *testing.T) {
 	dir := t.TempDir()
 
 	mainCfg := `{
-  "include": ["packs/*/pack.json"],
+  "include": ["cfg/base.json"],
   "profiles": {
-    "work": { "include": ["packs/work/pack.json"] }
+    "work": { "include": ["cfg/work.json"] }
   }
 }`
 	if err := os.WriteFile(filepath.Join(dir, "dm.json"), []byte(mainCfg), 0644); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.MkdirAll(filepath.Join(dir, "packs", "base"), 0755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.MkdirAll(filepath.Join(dir, "packs", "work"), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Join(dir, "cfg"), 0755); err != nil {
 		t.Fatal(err)
 	}
 	defaultCfg := `{"jump": {"home": "C:/home"}}`
-	if err := os.WriteFile(filepath.Join(dir, "packs", "base", "pack.json"), []byte(defaultCfg), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "cfg", "base.json"), []byte(defaultCfg), 0644); err != nil {
 		t.Fatal(err)
 	}
 	workCfg := `{"jump": {"office": "C:/office"}}`
-	if err := os.WriteFile(filepath.Join(dir, "packs", "work", "pack.json"), []byte(workCfg), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "cfg", "work.json"), []byte(workCfg), 0644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -78,15 +81,15 @@ func TestLoadWithProfile(t *testing.T) {
 func TestCache(t *testing.T) {
 	dir := t.TempDir()
 
-	mainCfg := `{"include": ["packs/*/pack.json"]}`
+	mainCfg := `{"include": ["cfg/base.json"]}`
 	if err := os.WriteFile(filepath.Join(dir, "dm.json"), []byte(mainCfg), 0644); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.MkdirAll(filepath.Join(dir, "packs", "base"), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Join(dir, "cfg"), 0755); err != nil {
 		t.Fatal(err)
 	}
 	jumpCfg := `{"jump": {"dev": "E:/dev"}}`
-	if err := os.WriteFile(filepath.Join(dir, "packs", "base", "pack.json"), []byte(jumpCfg), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "cfg", "base.json"), []byte(jumpCfg), 0644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -107,26 +110,14 @@ func TestCache(t *testing.T) {
 	}
 }
 
-func TestPackDefaultKnowledge(t *testing.T) {
+func TestNoImplicitPackInclude(t *testing.T) {
 	dir := t.TempDir()
 
-	mainCfg := `{"include": ["packs/*/pack.json"]}`
-	if err := os.WriteFile(filepath.Join(dir, "dm.json"), []byte(mainCfg), 0644); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.MkdirAll(filepath.Join(dir, "packs", "base"), 0755); err != nil {
-		t.Fatal(err)
-	}
-	packCfg := `{"jump": {"dev": "E:/dev"}}`
-	if err := os.WriteFile(filepath.Join(dir, "packs", "base", "pack.json"), []byte(packCfg), 0644); err != nil {
-		t.Fatal(err)
-	}
-
-	cfg, err := Load(filepath.Join(dir, "dm.json"), Options{Pack: "base", UseCache: false})
+	cfg, err := Load(filepath.Join(dir, "dm.json"), Options{UseCache: false})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cfg.Search.Knowledge != filepath.Join("packs", "base", "knowledge") {
-		t.Fatalf("expected default knowledge, got %v", cfg.Search.Knowledge)
+	if len(cfg.Jump) != 0 || len(cfg.Run) != 0 || len(cfg.Projects) != 0 {
+		t.Fatalf("expected empty config when dm.json is missing, got %#v", cfg)
 	}
 }

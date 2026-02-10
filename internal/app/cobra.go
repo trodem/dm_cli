@@ -24,7 +24,7 @@ func Run(args []string) int {
 		Short: "Personal CLI for jumps, project actions, and knowledge search",
 		Long:  "dm is a personal CLI to jump to folders, run aliases/actions, and search knowledge notes.",
 		Example: "dm help\n" +
-			"dm help pack\n" +
+			"dm help plugins\n" +
 			"dm help <function_name>",
 		SilenceErrors: true,
 		SilenceUsage:  true,
@@ -39,12 +39,9 @@ func Run(args []string) int {
 
 	root.PersistentFlags().BoolVar(&opts.NoCache, "no-cache", false, "disable config cache")
 	root.PersistentFlags().StringVar(&opts.Profile, "profile", "", "use profile")
-	root.PersistentFlags().StringVarP(&opts.Pack, "pack", "p", "", "use pack")
 	root.PersistentFlags().BoolP("tools", "t", false, "shortcut for 'tools' command")
-	root.PersistentFlags().BoolP("packs", "k", false, "shortcut for 'pack' command")
-	root.PersistentFlags().BoolP("plugins", "g", false, "shortcut for 'plugin' command")
+	root.PersistentFlags().BoolP("plugins", "p", false, "shortcut for 'plugins' command")
 	root.CompletionOptions.DisableDefaultCmd = true
-	_ = root.RegisterFlagCompletionFunc("pack", completePackNames)
 
 	addCobraSubcommands(root, &opts)
 	addPluginAwareHelpCommand(root, &opts)
@@ -94,9 +91,6 @@ func legacyArgsWithFlags(opts flags, positional []string) []string {
 	}
 	if opts.Profile != "" {
 		legacyArgs = append(legacyArgs, "--profile", opts.Profile)
-	}
-	if opts.Pack != "" {
-		legacyArgs = append(legacyArgs, "--pack", opts.Pack)
 	}
 	legacyArgs = append(legacyArgs, positional...)
 	return legacyArgs
