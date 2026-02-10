@@ -5,7 +5,7 @@ $varTestPath="C:\Users\Demtro\Downloads"
 
 
 function dev_path {
-    Set-Location "$varDevPath"
+    Set-Location $varDevPath
 }
 
 

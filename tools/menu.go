@@ -16,6 +16,13 @@ type toolMenuItem struct {
 	Synopsis string
 }
 
+type AutoRunResult struct {
+	Code           int
+	CanContinue    bool
+	ContinuePrompt string
+	ContinueParams map[string]string
+}
+
 var toolMenuItems = []toolMenuItem{
 	{Key: "s", Name: "search", Synopsis: "Search files by name/extension"},
 	{Key: "r", Name: "rename", Synopsis: "Batch rename files with preview"},
@@ -73,15 +80,19 @@ func RunByName(baseDir, name string) int {
 }
 
 func RunByNameWithParams(baseDir, name string, params map[string]string) int {
+	return RunByNameWithParamsDetailed(baseDir, name, params).Code
+}
+
+func RunByNameWithParamsDetailed(baseDir, name string, params map[string]string) AutoRunResult {
 	switch normalizeToolName(name) {
 	case "search":
-		return RunSearchAuto(baseDir, params)
+		return RunSearchAutoDetailed(baseDir, params)
 	case "recent":
-		return RunRecentAuto(baseDir, params)
+		return RunRecentAutoDetailed(baseDir, params)
 	case "clean":
-		return RunCleanEmptyAuto(baseDir, params)
+		return AutoRunResult{Code: RunCleanEmptyAuto(baseDir, params)}
 	default:
-		return RunByName(baseDir, name)
+		return AutoRunResult{Code: RunByName(baseDir, name)}
 	}
 }
 

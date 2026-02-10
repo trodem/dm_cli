@@ -29,9 +29,23 @@ func RunSearch(r *bufio.Reader) int {
 	ext := prompt(r, "Extension (optional)", "")
 	sortBy := prompt(r, "Sort (name|date|size)", "name")
 
-	results, code := runSearchQuery(base, name, ext, sortBy, 0)
-	if code != 0 {
-		return code
+	results, err := filesearch.Find(filesearch.Options{
+		BasePath: base,
+		NamePart: name,
+		Ext:      ext,
+		SortBy:   sortBy,
+	})
+	if err != nil {
+		fmt.Println("Error:", err)
+		return 1
+	}
+	if len(results) == 0 {
+		fmt.Println("No files found.")
+		return 0
+	}
+	for i, item := range results {
+		idx := ui.Warn(fmt.Sprintf("%2d)", i+1))
+		fmt.Printf("%s %s | %s | %s\n", idx, item.ModTime.Format("2006-01-02 15:04"), filesearch.FormatSize(item.Size), item.Path)
 	}
 
 	selection := prompt(r, "Select result to open (number, Enter to skip)", "")
@@ -48,6 +62,10 @@ func RunSearch(r *bufio.Reader) int {
 }
 
 func RunSearchAuto(baseDir string, params map[string]string) int {
+	return RunSearchAutoDetailed(baseDir, params).Code
+}
+
+func RunSearchAutoDetailed(baseDir string, params map[string]string) AutoRunResult {
 	base := strings.TrimSpace(params["base"])
 	if base == "" {
 		base = currentWorkingDir(baseDir)
@@ -59,17 +77,38 @@ func RunSearchAuto(baseDir string, params map[string]string) int {
 	if sortBy == "" {
 		sortBy = "name"
 	}
-	limit := 50
+	limit := 10
 	if rawLimit := strings.TrimSpace(params["limit"]); rawLimit != "" {
 		if n, err := strconv.Atoi(rawLimit); err == nil && n > 0 {
 			limit = n
 		}
 	}
-	_, code := runSearchQuery(base, name, ext, sortBy, limit)
-	return code
+	offset := 0
+	if rawOffset := strings.TrimSpace(params["offset"]); rawOffset != "" {
+		if n, err := strconv.Atoi(rawOffset); err == nil && n >= 0 {
+			offset = n
+		}
+	}
+	shown, total, code := runSearchQuery(base, name, ext, sortBy, offset, limit)
+	if code != 0 {
+		return AutoRunResult{Code: code}
+	}
+	nextOffset := offset + shown
+	if nextOffset < total {
+		next := copyStringMap(params)
+		next["offset"] = strconv.Itoa(nextOffset)
+		next["limit"] = strconv.Itoa(limit)
+		return AutoRunResult{
+			Code:           0,
+			CanContinue:    true,
+			ContinuePrompt: fmt.Sprintf("Show next %d search results? [Y/n]: ", limit),
+			ContinueParams: next,
+		}
+	}
+	return AutoRunResult{Code: 0}
 }
 
-func runSearchQuery(base, name, ext, sortBy string, limit int) ([]filesearch.Result, int) {
+func runSearchQuery(base, name, ext, sortBy string, offset, limit int) (int, int, int) {
 	results, err := filesearch.Find(filesearch.Options{
 		BasePath: base,
 		NamePart: name,
@@ -78,25 +117,38 @@ func runSearchQuery(base, name, ext, sortBy string, limit int) ([]filesearch.Res
 	})
 	if err != nil {
 		fmt.Println("Error:", err)
-		return nil, 1
+		return 0, 0, 1
 	}
 	if len(results) == 0 {
 		fmt.Println("No files found.")
-		return nil, 0
+		return 0, 0, 0
+	}
+	if offset < 0 {
+		offset = 0
+	}
+	if offset >= len(results) {
+		fmt.Println("No more files.")
+		return 0, len(results), 0
 	}
 
-	show := results
+	show := results[offset:]
 	if limit > 0 && len(show) > limit {
 		show = show[:limit]
 	}
+	start := offset + 1
+	end := offset + len(show)
+	fmt.Printf("Showing %d-%d of %d results\n", start, end, len(results))
 	for i, item := range show {
-		idx := ui.Warn(fmt.Sprintf("%2d)", i+1))
+		idx := ui.Warn(fmt.Sprintf("%2d)", offset+i+1))
 		fmt.Printf("%s %s | %s | %s\n", idx, item.ModTime.Format("2006-01-02 15:04"), filesearch.FormatSize(item.Size), item.Path)
 	}
 	if limit > 0 && len(results) > limit {
-		fmt.Println(ui.Muted(fmt.Sprintf("... and %d more", len(results)-limit)))
+		remaining := len(results) - end
+		if remaining > 0 {
+			fmt.Println(ui.Muted(fmt.Sprintf("... and %d more", remaining)))
+		}
 	}
-	return results, 0
+	return len(show), len(results), 0
 }
 
 func normalizeAgentPath(raw, fallbackBaseDir string) string {
@@ -126,6 +178,17 @@ func normalizeAgentPath(raw, fallbackBaseDir string) string {
 		}
 	}
 	return normalizeInputPath(p, currentWorkingDir(fallbackBaseDir))
+}
+
+func copyStringMap(in map[string]string) map[string]string {
+	if len(in) == 0 {
+		return map[string]string{}
+	}
+	out := make(map[string]string, len(in))
+	for k, v := range in {
+		out[k] = v
+	}
+	return out
 }
 
 func parseSelectionIndex(raw string, max int) (int, bool) {

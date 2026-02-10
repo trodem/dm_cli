@@ -360,9 +360,25 @@ func runAskOnce(baseDir, prompt string, opts agent.AskOptions, confirmTools bool
 				return 0
 			}
 		}
-		code := tools.RunByNameWithParams(baseDir, toolName, decision.ToolArgs)
-		if code != 0 {
-			return code
+		run := tools.RunByNameWithParamsDetailed(baseDir, toolName, decision.ToolArgs)
+		if run.Code != 0 {
+			return run.Code
+		}
+		reader := bufio.NewReader(os.Stdin)
+		for run.CanContinue {
+			promptText := run.ContinuePrompt
+			if strings.TrimSpace(promptText) == "" {
+				promptText = "Show more results? [Y/n]: "
+			}
+			fmt.Print(ui.Prompt(promptText))
+			nextChoice := strings.ToLower(strings.TrimSpace(readLine(reader)))
+			if nextChoice == "n" || nextChoice == "no" {
+				break
+			}
+			run = tools.RunByNameWithParamsDetailed(baseDir, toolName, run.ContinueParams)
+			if run.Code != 0 {
+				return run.Code
+			}
 		}
 		if strings.TrimSpace(decision.Answer) != "" {
 			fmt.Println(decision.Answer)
@@ -417,10 +433,10 @@ func buildPluginCatalog(baseDir string) string {
 
 func buildToolsCatalog() string {
 	return strings.Join([]string{
-		"- search: Search files by name/extension | tool_args: base, ext, name, sort, limit",
+		"- search: Search files by name/extension | tool_args: base, ext, name, sort, limit, offset",
 		"- rename: Batch rename files with preview",
 		"- note: Append a quick note to a file",
-		"- recent: Show recent files | tool_args: base, limit",
+		"- recent: Show recent files | tool_args: base, limit, offset",
 		"- backup: Create a folder zip backup",
 		"- clean: Delete empty folders | tool_args: base, apply (true for delete, otherwise preview)",
 		"- system: Show system/network snapshot",

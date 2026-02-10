@@ -39,46 +39,87 @@ func RunRecent(r *bufio.Reader) int {
 		return 1
 	}
 
-	return runRecentQuery(base, limit)
+	_, _, code := runRecentQuery(base, 0, limit)
+	return code
 }
 
 func RunRecentAuto(baseDir string, params map[string]string) int {
+	return RunRecentAutoDetailed(baseDir, params).Code
+}
+
+func RunRecentAutoDetailed(baseDir string, params map[string]string) AutoRunResult {
 	base := strings.TrimSpace(params["base"])
 	if base == "" {
 		base = currentWorkingDir(baseDir)
 	}
 	base = normalizeAgentPath(base, baseDir)
-	limit := 20
+	limit := 10
 	if rawLimit := strings.TrimSpace(params["limit"]); rawLimit != "" {
 		if n, err := strconv.Atoi(rawLimit); err == nil && n > 0 {
 			limit = n
 		}
 	}
-	return runRecentQuery(base, limit)
+	offset := 0
+	if rawOffset := strings.TrimSpace(params["offset"]); rawOffset != "" {
+		if n, err := strconv.Atoi(rawOffset); err == nil && n >= 0 {
+			offset = n
+		}
+	}
+	shown, total, code := runRecentQuery(base, offset, limit)
+	if code != 0 {
+		return AutoRunResult{Code: code}
+	}
+	nextOffset := offset + shown
+	if nextOffset < total {
+		next := copyStringMap(params)
+		next["offset"] = strconv.Itoa(nextOffset)
+		next["limit"] = strconv.Itoa(limit)
+		return AutoRunResult{
+			Code:           0,
+			CanContinue:    true,
+			ContinuePrompt: fmt.Sprintf("Show next %d recent files? [Y/n]: ", limit),
+			ContinueParams: next,
+		}
+	}
+	return AutoRunResult{Code: 0}
 }
 
-func runRecentQuery(base string, limit int) int {
+func runRecentQuery(base string, offset, limit int) (int, int, int) {
 	items, err := collectRecent(base)
 	if err != nil {
 		fmt.Println("Error:", err)
-		return 1
+		return 0, 0, 1
 	}
 	if len(items) == 0 {
 		fmt.Println("No files found.")
-		return 0
+		return 0, 0, 0
 	}
 
 	sort.Slice(items, func(i, j int) bool {
 		return items[i].ModTime.After(items[j].ModTime)
 	})
-	if len(items) > limit {
-		items = items[:limit]
+	if offset < 0 {
+		offset = 0
 	}
+	if offset >= len(items) {
+		fmt.Println("No more files.")
+		return 0, len(items), 0
+	}
+	show := items[offset:]
+	if len(show) > limit {
+		show = show[:limit]
+	}
+	start := offset + 1
+	end := offset + len(show)
+	fmt.Printf("Showing %d-%d of %d files\n", start, end, len(items))
 
-	for _, it := range items {
+	for _, it := range show {
 		fmt.Printf("%s | %s | %s\n", it.ModTime.Format("2006-01-02 15:04"), filesearch.FormatSize(it.Size), it.Path)
 	}
-	return 0
+	if len(items) > end {
+		fmt.Println(ui.Muted(fmt.Sprintf("... and %d more", len(items)-end)))
+	}
+	return len(show), len(items), 0
 }
 
 func collectRecent(base string) ([]recentItem, error) {

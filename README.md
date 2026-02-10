@@ -182,6 +182,7 @@ Tools tool-use:
 - for `search`, the agent can pass non-interactive params (`base`, `ext`, `name`, `sort`, `limit`)
 - for `recent`, the agent can pass non-interactive params (`base`, `limit`)
 - for `clean`, the agent can pass non-interactive params (`base`, `apply`)
+- for paged results (`search`/`recent`), `dm ask` prompts automatically to continue with next page
 
 Example:
 ```bash
