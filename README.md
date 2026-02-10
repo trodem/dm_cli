@@ -180,9 +180,11 @@ Tools tool-use:
 - the agent also receives the tools catalog (`search`, `rename`, `note`, `recent`, `backup`, `clean`, `system`)
 - when useful it can choose `run_tool` and `dm` will execute that tool flow
 - for `search`, the agent can pass non-interactive params (`base`, `ext`, `name`, `sort`, `limit`)
+- for `rename`, the agent can pass params (`base`, `from`, `to`, `name`, `case_sensitive`); missing required values are asked interactively
 - for `recent`, the agent can pass non-interactive params (`base`, `limit`)
 - for `clean`, the agent can pass non-interactive params (`base`, `apply`)
 - for paged results (`search`/`recent`), `dm ask` prompts automatically to continue with next page
+- for `rename`, file changes are applied only after explicit confirmation
 
 Example:
 ```bash

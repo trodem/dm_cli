@@ -87,6 +87,8 @@ func RunByNameWithParamsDetailed(baseDir, name string, params map[string]string)
 	switch normalizeToolName(name) {
 	case "search":
 		return RunSearchAutoDetailed(baseDir, params)
+	case "rename":
+		return RunRenameAutoDetailed(baseDir, params)
 	case "recent":
 		return RunRecentAutoDetailed(baseDir, params)
 	case "clean":

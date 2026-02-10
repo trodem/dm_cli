@@ -3,6 +3,7 @@ package tools
 import (
 	"bufio"
 	"fmt"
+	"os"
 	"strings"
 
 	"cli/internal/renamer"
@@ -58,4 +59,86 @@ func RunRename(baseDir string, r *bufio.Reader) int {
 	}
 	fmt.Println("Done.")
 	return 0
+}
+
+func RunRenameAutoDetailed(baseDir string, params map[string]string) AutoRunResult {
+	reader := bufio.NewReader(os.Stdin)
+	cwd := currentWorkingDir(baseDir)
+
+	base, ok := params["base"]
+	if !ok || strings.TrimSpace(base) == "" {
+		base = prompt(reader, "Base path", cwd)
+	}
+	base = normalizeInputPath(base, cwd)
+	if err := validateExistingDir(base, "base path"); err != nil {
+		fmt.Println(ui.Error("Error:"), err)
+		fmt.Println(ui.Muted("Hint: use '.' for current dir or '..' for parent dir."))
+		return AutoRunResult{Code: 1}
+	}
+
+	from, ok := params["from"]
+	if !ok || strings.TrimSpace(from) == "" {
+		from = prompt(reader, "Replace from", "")
+	}
+	from = strings.TrimSpace(from)
+	if from == "" {
+		fmt.Println("Error: replace-from is required.")
+		return AutoRunResult{Code: 1}
+	}
+
+	namePart := strings.TrimSpace(params["name"])
+	if _, has := params["name"]; !has {
+		namePart = prompt(reader, "Name contains (optional)", "")
+	}
+
+	to, hasTo := params["to"]
+	if !hasTo {
+		to = prompt(reader, "Replace to (empty = delete)", "")
+	}
+
+	caseSensitive := false
+	if rawCase, has := params["case_sensitive"]; has {
+		v := strings.ToLower(strings.TrimSpace(rawCase))
+		caseSensitive = v == "1" || v == "true" || v == "yes" || v == "y"
+	} else {
+		caseSensitive = strings.ToLower(strings.TrimSpace(prompt(reader, "Case sensitive for replace? (y/N)", "N"))) == "y"
+	}
+
+	opts := renamer.Options{
+		BasePath:      base,
+		NamePart:      namePart,
+		From:          from,
+		To:            to,
+		Recursive:     true,
+		UseRegex:      false,
+		CaseSensitive: caseSensitive,
+	}
+
+	plan, err := renamer.BuildPlan(opts)
+	if err != nil {
+		fmt.Println("Error:", err)
+		return AutoRunResult{Code: 1}
+	}
+	if len(plan) == 0 {
+		fmt.Println("No files to rename.")
+		return AutoRunResult{Code: 0}
+	}
+
+	fmt.Println("\nPreview:")
+	for _, item := range plan {
+		fmt.Printf("%s -> %s\n", item.OldPath, item.NewPath)
+	}
+
+	confirm := prompt(reader, "Apply these renames? [y/N]", "N")
+	if strings.ToLower(strings.TrimSpace(confirm)) != "y" {
+		fmt.Println(ui.Warn("Canceled."))
+		return AutoRunResult{Code: 0}
+	}
+
+	if err := renamer.ApplyPlan(plan); err != nil {
+		fmt.Println("Error:", err)
+		return AutoRunResult{Code: 1}
+	}
+	fmt.Println("Done.")
+	return AutoRunResult{Code: 0}
 }

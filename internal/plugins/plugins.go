@@ -2,8 +2,10 @@ package plugins
 
 import (
 	"bufio"
+	"bytes"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -39,6 +41,19 @@ type Info struct {
 	Description string
 	Parameters  []string
 	Examples    []string
+}
+
+type RunError struct {
+	Err    error
+	Output string
+}
+
+func (e *RunError) Error() string {
+	return e.Err.Error()
+}
+
+func (e *RunError) Unwrap() error {
+	return e.Err
 }
 
 var ErrNotFound = errors.New("plugin not found")
@@ -203,6 +218,14 @@ func Run(baseDir, name string, args []string) error {
 
 func IsNotFound(err error) bool {
 	return errors.Is(err, ErrNotFound)
+}
+
+func ErrorOutput(err error) string {
+	var re *RunError
+	if errors.As(err, &re) {
+		return strings.TrimSpace(re.Output)
+	}
+	return ""
 }
 
 func findPlugin(dir, name string) (string, error) {
@@ -542,10 +565,14 @@ func runPowerShellFunction(profilePaths []string, functionName string, args []st
 		script += " " + strings.Join(quoted, " ")
 	}
 	cmd := exec.Command(ps, "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", script)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
+	var output bytes.Buffer
+	cmd.Stdout = io.MultiWriter(os.Stdout, &output)
+	cmd.Stderr = io.MultiWriter(os.Stderr, &output)
 	cmd.Stdin = os.Stdin
-	return cmd.Run()
+	if err := cmd.Run(); err != nil {
+		return &RunError{Err: err, Output: output.String()}
+	}
+	return nil
 }
 
 func execPlugin(path string, args []string) error {
@@ -593,10 +620,14 @@ func execPlugin(path string, args []string) error {
 		cmd.Args = append(cmd.Args, args...)
 	}
 
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
+	var output bytes.Buffer
+	cmd.Stdout = io.MultiWriter(os.Stdout, &output)
+	cmd.Stderr = io.MultiWriter(os.Stderr, &output)
 	cmd.Stdin = os.Stdin
-	return cmd.Run()
+	if err := cmd.Run(); err != nil {
+		return &RunError{Err: err, Output: output.String()}
+	}
+	return nil
 }
 
 func isSupportedPlugin(name string) bool {

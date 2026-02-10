@@ -63,6 +63,7 @@ Repository guidelines for automated agents.
 ## PowerShell Plugin Conventions
 - Store public PowerShell plugin commands in `plugins/functions/*.ps1`.
 - Keep shared variables and helper utilities in `plugins/variables.ps1`.
+- If support helpers are needed for agent/plugin workflows, add them in `plugins/utils.ps1` so shared capabilities are centralized and reusable.
 - Use `Set-StrictMode -Version Latest` and `$ErrorActionPreference = "Stop"` in plugin `.ps1` files.
 - Public plugin function names must be explicit and domain-prefixed (for example `g_*`, `stibs_*`).
 - Private helper functions must start with `_` so they are not exposed as CLI commands.

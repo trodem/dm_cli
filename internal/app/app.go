@@ -309,9 +309,9 @@ func runAskOnce(baseDir, prompt string, opts agent.AskOptions, confirmTools bool
 		fmt.Println()
 		if confirmTools {
 			reader := bufio.NewReader(os.Stdin)
-			fmt.Print(ui.Prompt("Confirm agent action? [y/N]: "))
+			fmt.Print(ui.Prompt("Confirm agent action? [Y/n]: "))
 			confirm := strings.ToLower(strings.TrimSpace(readLine(reader)))
-			if confirm != "y" && confirm != "yes" {
+			if confirm == "n" || confirm == "no" {
 				fmt.Println(ui.Warn("Canceled."))
 				if strings.TrimSpace(decision.Answer) != "" {
 					fmt.Println(decision.Answer)
@@ -320,7 +320,7 @@ func runAskOnce(baseDir, prompt string, opts agent.AskOptions, confirmTools bool
 			}
 		}
 		if err := plugins.Run(baseDir, decision.Plugin, decision.Args); err != nil {
-			fmt.Println("Error:", err)
+			printAgentActionError(err)
 			return 1
 		}
 		if strings.TrimSpace(decision.Answer) != "" {
@@ -350,9 +350,9 @@ func runAskOnce(baseDir, prompt string, opts agent.AskOptions, confirmTools bool
 		}
 		if confirmTools {
 			reader := bufio.NewReader(os.Stdin)
-			fmt.Print(ui.Prompt("Confirm agent action? [y/N]: "))
+			fmt.Print(ui.Prompt("Confirm agent action? [Y/n]: "))
 			confirm := strings.ToLower(strings.TrimSpace(readLine(reader)))
-			if confirm != "y" && confirm != "yes" {
+			if confirm == "n" || confirm == "no" {
 				fmt.Println(ui.Warn("Canceled."))
 				if strings.TrimSpace(decision.Answer) != "" {
 					fmt.Println(decision.Answer)
@@ -434,7 +434,7 @@ func buildPluginCatalog(baseDir string) string {
 func buildToolsCatalog() string {
 	return strings.Join([]string{
 		"- search: Search files by name/extension | tool_args: base, ext, name, sort, limit, offset",
-		"- rename: Batch rename files with preview",
+		"- rename: Batch rename files with preview | tool_args: base, from, to, name, case_sensitive",
 		"- note: Append a quick note to a file",
 		"- recent: Show recent files | tool_args: base, limit, offset",
 		"- backup: Create a folder zip backup",
@@ -828,6 +828,7 @@ func min3(a, b, c int) int {
 
 var psFunctionName = regexp.MustCompile(`(?i)^\s*function\s+([a-z0-9_-]+)\b`)
 var psSetAlias = regexp.MustCompile(`(?i)^\s*(?:set-alias|new-alias)\s+([^\s]+)\s+([^\s#]+)`)
+var missingPathErr = regexp.MustCompile(`(?i)required path '([^']+)' does not exist`)
 
 func resolveUserPowerShellProfilePath() string {
 	home, _ := os.UserHomeDir()
@@ -1205,4 +1206,14 @@ func argsHintFromExample(functionName, example string) string {
 		return hint
 	}
 	return ""
+}
+
+func printAgentActionError(err error) {
+	fmt.Println("Error:", err)
+	combined := strings.TrimSpace(err.Error() + "\n" + plugins.ErrorOutput(err))
+	m := missingPathErr.FindStringSubmatch(combined)
+	if len(m) == 2 {
+		fmt.Println(ui.Warn("Missing required path: " + m[1]))
+		fmt.Println(ui.Muted("Fix the path in plugin variables/config, then retry."))
+	}
 }

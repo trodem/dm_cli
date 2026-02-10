@@ -142,6 +142,7 @@ func DecideWithPlugins(userPrompt string, pluginCatalog string, toolCatalog stri
 		"- do not invent plugin names",
 		"- do not invent tool names",
 		"- for search tool prefer tool_args keys: base, ext, name, sort, limit, offset",
+		"- for rename tool prefer tool_args keys: base, from, to, name, case_sensitive",
 		"- for recent tool prefer tool_args keys: base, limit, offset",
 		"- for clean tool prefer tool_args keys: base, apply",
 		"",
