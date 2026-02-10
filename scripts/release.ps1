@@ -86,6 +86,9 @@ try {
     if (Test-Path "scripts/install.ps1") {
       Copy-Item "scripts/install.ps1" (Join-Path $stageDir "install.ps1")
     }
+    if (Test-Path "dm.agent.json") {
+      Copy-Item "dm.agent.json" (Join-Path $stageDir "dm.agent.json")
+    }
     if (Test-Path "plugins") {
       Copy-Item -Recurse -Force "plugins" (Join-Path $stageDir "plugins")
     }

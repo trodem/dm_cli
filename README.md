@@ -47,6 +47,7 @@ This produces:
 Each artifact folder/zip includes:
 - `dm` or `dm.exe`
 - `install.ps1`
+- `dm.agent.json` (if present)
 - `README.txt`
 - `README.md`
 - `LICENSE` (if present)
