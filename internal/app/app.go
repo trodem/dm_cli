@@ -32,6 +32,7 @@ func runLegacy(args []string) int {
 	if len(rest) == 0 {
 		ui.PrintSplash(ui.SplashData{
 			BaseDir: baseDir,
+			Version: Version,
 		})
 		return 0
 	}
