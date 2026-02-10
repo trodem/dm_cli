@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 
+	"cli/internal/agent"
 	"cli/internal/config"
 	"cli/internal/plugins"
 	"cli/internal/runner"
@@ -107,6 +108,16 @@ func runLegacy(args []string) int {
 		name := args[1]
 		runner.RunAlias(cfg, name, "")
 		return 0
+	case "ask":
+		askOpts, confirmTools, prompt, err := parseLegacyAskArgs(args[1:])
+		if err != nil {
+			fmt.Println("Error:", err)
+			return 1
+		}
+		if strings.TrimSpace(prompt) == "" {
+			return runAskInteractive(baseDir, askOpts, confirmTools)
+		}
+		return runAskOnce(baseDir, prompt, askOpts, confirmTools)
 	}
 
 	// PROJECT MODE: dm <project> <action>
@@ -230,6 +241,134 @@ func parseFlags(args []string) (flags, []string) {
 		out = append(out, arg)
 	}
 	return f, out
+}
+
+func parseLegacyAskArgs(args []string) (agent.AskOptions, bool, string, error) {
+	var opts agent.AskOptions
+	var confirmTools bool
+	var promptParts []string
+	for i := 0; i < len(args); i++ {
+		switch args[i] {
+		case "--provider":
+			if i+1 >= len(args) {
+				return opts, confirmTools, "", fmt.Errorf("missing value for --provider")
+			}
+			opts.Provider = args[i+1]
+			i++
+		case "--model":
+			if i+1 >= len(args) {
+				return opts, confirmTools, "", fmt.Errorf("missing value for --model")
+			}
+			opts.Model = args[i+1]
+			i++
+		case "--base-url":
+			if i+1 >= len(args) {
+				return opts, confirmTools, "", fmt.Errorf("missing value for --base-url")
+			}
+			opts.BaseURL = args[i+1]
+			i++
+		case "--confirm-tools":
+			confirmTools = true
+		default:
+			promptParts = append(promptParts, args[i])
+		}
+	}
+	return opts, confirmTools, strings.Join(promptParts, " "), nil
+}
+
+func runAskOnce(baseDir, prompt string, opts agent.AskOptions, confirmTools bool) int {
+	catalog := buildPluginCatalog(baseDir)
+	decision, err := agent.DecideWithPlugins(prompt, catalog, opts)
+	if err != nil {
+		fmt.Println("Error:", err)
+		return 1
+	}
+	fmt.Printf("[%s | %s]\n", decision.Provider, decision.Model)
+	if decision.Action == "run_plugin" {
+		if strings.TrimSpace(decision.Plugin) == "" {
+			fmt.Println("Error: agent selected run_plugin without plugin name")
+			return 1
+		}
+		if _, err := plugins.GetInfo(baseDir, decision.Plugin); err != nil {
+			fmt.Println("Error: agent selected unknown plugin:", decision.Plugin)
+			if strings.TrimSpace(decision.Answer) != "" {
+				fmt.Println(decision.Answer)
+			}
+			return 1
+		}
+		if strings.TrimSpace(decision.Reason) != "" {
+			fmt.Println("Reason:", decision.Reason)
+		}
+		fmt.Printf("Running plugin: %s", decision.Plugin)
+		if len(decision.Args) > 0 {
+			fmt.Printf(" %s", strings.Join(decision.Args, " "))
+		}
+		fmt.Println()
+		if confirmTools {
+			reader := bufio.NewReader(os.Stdin)
+			fmt.Print(ui.Prompt("Confirm plugin execution? [y/N]: "))
+			confirm := strings.ToLower(strings.TrimSpace(readLine(reader)))
+			if confirm != "y" && confirm != "yes" {
+				fmt.Println(ui.Warn("Canceled."))
+				if strings.TrimSpace(decision.Answer) != "" {
+					fmt.Println(decision.Answer)
+				}
+				return 0
+			}
+		}
+		if err := plugins.Run(baseDir, decision.Plugin, decision.Args); err != nil {
+			fmt.Println("Error:", err)
+			return 1
+		}
+		if strings.TrimSpace(decision.Answer) != "" {
+			fmt.Println(decision.Answer)
+		}
+		return 0
+	}
+	fmt.Println(decision.Answer)
+	return 0
+}
+
+func runAskInteractive(baseDir string, opts agent.AskOptions, confirmTools bool) int {
+	fmt.Println("Ask mode. Type your question.")
+	fmt.Println("Exit commands: /exit, exit, quit")
+	reader := bufio.NewReader(os.Stdin)
+	for {
+		fmt.Print("ask> ")
+		line, err := reader.ReadString('\n')
+		if err != nil && strings.TrimSpace(line) == "" {
+			fmt.Println()
+			return 0
+		}
+		prompt := strings.TrimSpace(line)
+		switch strings.ToLower(prompt) {
+		case "":
+			continue
+		case "/exit", "exit", "quit":
+			return 0
+		}
+		_ = runAskOnce(baseDir, prompt, opts, confirmTools)
+	}
+}
+
+func buildPluginCatalog(baseDir string) string {
+	items, err := plugins.ListEntries(baseDir, true)
+	if err != nil || len(items) == 0 {
+		return "(none)"
+	}
+	lines := make([]string, 0, len(items))
+	for _, item := range items {
+		info, _ := plugins.GetInfo(baseDir, item.Name)
+		line := fmt.Sprintf("- %s (%s)", item.Name, item.Kind)
+		if strings.TrimSpace(info.Synopsis) != "" {
+			line += ": " + info.Synopsis
+		}
+		if len(info.Parameters) > 0 {
+			line += " | params: " + strings.Join(info.Parameters, "; ")
+		}
+		lines = append(lines, line)
+	}
+	return strings.Join(lines, "\n")
 }
 
 func runValidate(baseDir string, cfg config.Config) int {

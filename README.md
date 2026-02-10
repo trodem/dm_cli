@@ -129,6 +129,9 @@ dm plugins info <name>
 dm plugins menu
 dm plugins run <name> [args...]
 dm <plugin> [args...]
+dm ask <prompt...>
+dm ask --provider ollama --model deepseek-coder-v2:latest "spiegami questo errore"
+dm ask
 dm run <alias>
 dm tools
 dm tools <tool>
@@ -145,8 +148,57 @@ Notes:
   - `-p` / `--plugins` => `plugins`
   - `-o` / `--open` => `open`
 - Fallback dispatch:
-  - `dm <name>` now tries `jump/project` first, then direct plugin execution.
+- `dm <name>` now tries `jump/project` first, then direct plugin execution.
   - If no plugin exists, `dm` returns an error.
+
+## AI Agent
+`dm ask` uses AI with this priority:
+- Ollama first: model `deepseek-coder-v2:latest`
+- OpenAI fallback: if Ollama is unavailable
+
+Runtime overrides:
+- `--provider auto|ollama|openai` (default `auto`)
+- `--model <name>` (override model for selected provider)
+- `--base-url <url>` (override provider base URL)
+- `--confirm-tools` (ask confirmation before running plugin/function selected by the agent)
+
+Interactive mode:
+- `dm ask` opens a persistent ask prompt
+- It exits only with explicit commands: `/exit`, `exit`, `quit`
+
+Response header:
+- each answer prints `[provider | model]` before the text
+
+Plugin tool-use:
+- the agent receives the full plugin/function catalog
+- when useful it can choose `run_plugin` and `dm` will execute that plugin/function
+- plugin execution is shown in output with selected plugin name and args
+
+Safe execution example:
+```bash
+dm ask --confirm-tools "riavvia backend dev"
+```
+
+User config is loaded outside the repository from:
+- `DM_AGENT_CONFIG` (optional override)
+- default: `dm.agent.json` next to `dm.exe`
+
+Example:
+```json
+{
+  "ollama": {
+    "base_url": "http://127.0.0.1:11434",
+    "model": "deepseek-coder-v2:latest"
+  },
+  "openai": {
+    "api_key": "sk-...",
+    "model": "gpt-4o-mini"
+  }
+}
+```
+
+You can also provide the OpenAI key with environment variable:
+- `OPENAI_API_KEY`
 
 Interactive target:
 ```bash

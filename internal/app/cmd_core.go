@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"cli/internal/agent"
 	"cli/internal/plugins"
 	"cli/internal/runner"
 	"cli/internal/ui"
@@ -180,6 +181,45 @@ func addCobraSubcommands(root *cobra.Command, opts *flags) {
 			return nil
 		},
 	})
+	var askProvider string
+	var askModel string
+	var askBaseURL string
+	var askConfirmTools bool
+	askCmd := &cobra.Command{
+		Use:   "ask <prompt...>",
+		Short: "Ask AI (Ollama first, OpenAI fallback)",
+		Long: "Tries local Ollama with model deepseek-coder-v2:latest first. " +
+			"If unavailable, falls back to OpenAI using user config in ~/.config/dm/agent.json.",
+		Args: cobra.ArbitraryArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			askOpts := agent.AskOptions{
+				Provider: askProvider,
+				Model:    askModel,
+				BaseURL:  askBaseURL,
+			}
+			rt, err := loadRuntime(*opts)
+			if err != nil {
+				return err
+			}
+			if len(args) == 0 {
+				code := runAskInteractive(rt.BaseDir, askOpts, askConfirmTools)
+				if code != 0 {
+					return exitCodeError{code: code}
+				}
+				return nil
+			}
+			code := runAskOnce(rt.BaseDir, strings.Join(args, " "), askOpts, askConfirmTools)
+			if code != 0 {
+				return exitCodeError{code: code}
+			}
+			return nil
+		},
+	}
+	askCmd.Flags().StringVar(&askProvider, "provider", "auto", "provider: auto|ollama|openai")
+	askCmd.Flags().StringVar(&askModel, "model", "", "override model for selected provider")
+	askCmd.Flags().StringVar(&askBaseURL, "base-url", "", "override base URL for selected provider")
+	askCmd.Flags().BoolVar(&askConfirmTools, "confirm-tools", false, "ask confirmation before agent runs a plugin/function")
+	root.AddCommand(askCmd)
 }
 
 func newPluginCommand(opts *flags) *cobra.Command {
@@ -233,9 +273,9 @@ func newPluginCommand(opts *flags) *cobra.Command {
 		},
 	})
 	pluginCmd.AddCommand(&cobra.Command{
-		Use:   "info <name>",
-		Short: "Show plugin/function details",
-		Args:  cobra.ExactArgs(1),
+		Use:               "info <name>",
+		Short:             "Show plugin/function details",
+		Args:              cobra.ExactArgs(1),
 		ValidArgsFunction: completePluginEntryNames(opts),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runPluginArgs("info", args[0])
@@ -250,9 +290,9 @@ func newPluginCommand(opts *flags) *cobra.Command {
 		},
 	})
 	pluginCmd.AddCommand(&cobra.Command{
-		Use:   "run <name> [args...]",
-		Short: "Run a plugin",
-		Args:  cobra.MinimumNArgs(1),
+		Use:               "run <name> [args...]",
+		Short:             "Run a plugin",
+		Args:              cobra.MinimumNArgs(1),
 		ValidArgsFunction: completePluginEntryNames(opts),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			out := append([]string{"run"}, args...)
