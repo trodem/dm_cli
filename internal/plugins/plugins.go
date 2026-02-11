@@ -3,6 +3,7 @@ package plugins
 import (
 	"bufio"
 	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -552,19 +553,57 @@ func runPowerShellFunction(profilePaths []string, functionName string, args []st
 	if ps == "" {
 		return errors.New("pwsh/powershell executable not found")
 	}
-	quotedPaths := make([]string, 0, len(profilePaths))
-	for _, p := range profilePaths {
-		quotedPaths = append(quotedPaths, quotePowerShellArg(p))
+	profileJSON, err := json.Marshal(profilePaths)
+	if err != nil {
+		return err
 	}
-	script := "$dmProfilePaths=@(" + strings.Join(quotedPaths, ",") + "); $oldEap=$ErrorActionPreference; $ErrorActionPreference='SilentlyContinue'; foreach($dmProfilePath in $dmProfilePaths){ if(Test-Path $dmProfilePath){ Invoke-Expression (Get-Content -Raw $dmProfilePath) } }; $ErrorActionPreference=$oldEap; " + functionName
-	if len(args) > 0 {
-		quoted := make([]string, 0, len(args))
-		for _, a := range args {
-			quoted = append(quoted, quotePowerShellArg(a))
+	argsJSON, err := json.Marshal(args)
+	if err != nil {
+		return err
+	}
+
+	var cmd *exec.Cmd
+	if runnerPath, ok := findPluginRunner(profilePaths); ok {
+		cmd = exec.Command(
+			ps,
+			"-NoProfile",
+			"-NonInteractive",
+			"-File",
+			runnerPath,
+			"-FunctionName", functionName,
+			"-ProfilePathsJson", string(profileJSON),
+			"-ArgsJson", string(argsJSON),
+		)
+	} else {
+		// Fallback if packaged runner is not available.
+		quotedPaths := make([]string, 0, len(profilePaths))
+		for _, p := range profilePaths {
+			quotedPaths = append(quotedPaths, quotePowerShellArg(p))
 		}
-		script += " " + strings.Join(quoted, " ")
+		quotedArgs := make([]string, 0, len(args))
+		for _, a := range args {
+			quotedArgs = append(quotedArgs, quotePowerShellArg(a))
+		}
+		scriptBody := strings.Join([]string{
+			"$ErrorActionPreference='Stop'",
+			"$dmProfilePaths=@(" + strings.Join(quotedPaths, ",") + ")",
+			"$dmArgs=@(" + strings.Join(quotedArgs, ",") + ")",
+			"foreach($dmProfilePath in $dmProfilePaths){ if(Test-Path -LiteralPath $dmProfilePath){ . $dmProfilePath } }",
+			"& " + functionName + " @dmArgs",
+		}, "\n") + "\n"
+		tmp, tmpErr := os.CreateTemp("", "dm-plugin-*.ps1")
+		if tmpErr != nil {
+			return tmpErr
+		}
+		tmpPath := tmp.Name()
+		_ = tmp.Close()
+		defer func() { _ = os.Remove(tmpPath) }()
+		if writeErr := os.WriteFile(tmpPath, []byte(scriptBody), 0600); writeErr != nil {
+			return writeErr
+		}
+		cmd = exec.Command(ps, "-NoProfile", "-NonInteractive", "-File", tmpPath)
 	}
-	cmd := exec.Command(ps, "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", script)
+
 	var output bytes.Buffer
 	cmd.Stdout = io.MultiWriter(os.Stdout, &output)
 	cmd.Stderr = io.MultiWriter(os.Stderr, &output)
@@ -583,11 +622,11 @@ func execPlugin(path string, args []string) error {
 	case "windows":
 		switch ext {
 		case ".ps1":
-			ps := firstAvailableBinary("powershell", "pwsh")
+			ps := firstAvailableBinary("pwsh", "powershell")
 			if ps == "" {
 				return errors.New("powershell executable not found")
 			}
-			cmd = exec.Command(ps, "-ExecutionPolicy", "Bypass", "-File", path)
+			cmd = exec.Command(ps, "-NoProfile", "-NonInteractive", "-File", path)
 		case ".sh":
 			sh := firstAvailableBinary("sh", "bash")
 			if sh == "" {
@@ -660,6 +699,27 @@ func runnerForPath(path string) string {
 		}
 	}
 	return "unknown"
+}
+
+func findPluginRunner(profilePaths []string) (string, bool) {
+	for _, p := range profilePaths {
+		cur := filepath.Dir(p)
+		for i := 0; i < 6; i++ {
+			if strings.EqualFold(filepath.Base(cur), "plugins") {
+				runner := filepath.Join(cur, "internal", "_dm_runner.ps1")
+				if info, err := os.Stat(runner); err == nil && !info.IsDir() {
+					return runner, true
+				}
+				return "", false
+			}
+			parent := filepath.Dir(cur)
+			if parent == cur {
+				break
+			}
+			cur = parent
+		}
+	}
+	return "", false
 }
 
 func pluginName(name string) string {
