@@ -1,0 +1,12 @@
+  {
+    "ollama": {
+      "base_url": "http://127.0.0.1:11434",
+      "model": "deepseek-coder-v2:latest"
+    },
+    "openai": {
+      "api_key": "OPENAI_KEY",
+      "model": "gpt-4o-mini",
+      "base_url": "https://api.openai.com/v1"
+    }
+  }
+  
