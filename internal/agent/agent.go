@@ -83,7 +83,7 @@ func AskWithOptions(prompt string, opts AskOptions) (AskResult, error) {
 
 	provider := strings.ToLower(strings.TrimSpace(opts.Provider))
 	if provider == "" {
-		provider = "auto"
+		provider = "openai"
 	}
 
 	switch provider {
@@ -125,7 +125,7 @@ func ResolveSessionProvider(opts AskOptions) (SessionProvider, error) {
 	openAIBase, openAIModel, openAIKey := resolvedOpenAI(cfg)
 	reqProvider := strings.ToLower(strings.TrimSpace(opts.Provider))
 	if reqProvider == "" {
-		reqProvider = "auto"
+		reqProvider = "openai"
 	}
 
 	switch reqProvider {

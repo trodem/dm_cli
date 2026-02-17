@@ -160,7 +160,7 @@ Notes:
 - OpenAI fallback: if Ollama is unavailable
 
 Runtime overrides:
-- `--provider auto|ollama|openai` (default `auto`)
+- `--provider openai|auto|ollama` (default `openai`)
 - `--model <name>` (override model for selected provider)
 - `--base-url <url>` (override provider base URL)
 - `--confirm-tools` (default `true`, ask confirmation before running plugin/function/tool selected by the agent)

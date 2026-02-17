@@ -247,7 +247,7 @@ func addCobraSubcommands(root *cobra.Command, opts *flags) {
 			return nil
 		},
 	}
-	askCmd.Flags().StringVar(&askProvider, "provider", "auto", "provider: auto|ollama|openai")
+	askCmd.Flags().StringVar(&askProvider, "provider", "openai", "provider: openai|auto|ollama")
 	askCmd.Flags().StringVar(&askModel, "model", "", "override model for selected provider")
 	askCmd.Flags().StringVar(&askBaseURL, "base-url", "", "override base URL for selected provider")
 	askCmd.Flags().BoolVar(&askConfirmTools, "confirm-tools", true, "ask confirmation before agent runs a plugin/function/tool")
