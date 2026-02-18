@@ -166,6 +166,10 @@ Runtime overrides:
 - `--base-url <url>` (override provider base URL)
 - `--confirm-tools` (default `true`, ask confirmation before running plugin/function/tool selected by the agent)
 - `--no-confirm-tools` (disable confirmation)
+- `--risk-policy strict|normal|off` (default `normal`)
+  - `strict`: always ask confirmation before agent actions
+  - `normal`: ask for high-risk actions even with `--no-confirm-tools`
+  - `off`: use only `--confirm-tools` / `--no-confirm-tools`
 
 Interactive mode:
 - `dm ask` opens a persistent ask prompt

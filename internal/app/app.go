@@ -128,15 +128,15 @@ func runLegacy(args []string) int {
 		runner.RunAlias(cfg, name, "")
 		return 0
 	case "ask":
-		askOpts, confirmTools, prompt, err := parseLegacyAskArgs(args[1:])
+		askOpts, confirmTools, riskPolicy, prompt, err := parseLegacyAskArgs(args[1:])
 		if err != nil {
 			fmt.Println("Error:", err)
 			return 1
 		}
 		if strings.TrimSpace(prompt) == "" {
-			return runAskInteractive(baseDir, askOpts, confirmTools)
+			return runAskInteractiveWithRisk(baseDir, askOpts, confirmTools, riskPolicy)
 		}
-		return runAskOnce(baseDir, prompt, askOpts, confirmTools)
+		return runAskOnceWithSession(baseDir, prompt, askOpts, confirmTools, riskPolicy, nil)
 	}
 
 	// PROJECT MODE: dm <project> <action>

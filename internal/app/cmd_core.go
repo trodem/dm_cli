@@ -213,6 +213,7 @@ func addCobraSubcommands(root *cobra.Command, opts *flags) {
 	var askBaseURL string
 	var askConfirmTools bool
 	var askNoConfirmTools bool
+	var askRiskPolicy string
 	askCmd := &cobra.Command{
 		Use:   "ask <prompt...>",
 		Short: "Ask AI (Ollama first, OpenAI fallback)",
@@ -229,18 +230,22 @@ func addCobraSubcommands(root *cobra.Command, opts *flags) {
 			if askNoConfirmTools {
 				confirmTools = false
 			}
+			riskPolicy, riskErr := normalizeRiskPolicy(askRiskPolicy)
+			if riskErr != nil {
+				return riskErr
+			}
 			rt, err := loadRuntime(*opts)
 			if err != nil {
 				return err
 			}
 			if len(args) == 0 {
-				code := runAskInteractive(rt.BaseDir, askOpts, confirmTools)
+				code := runAskInteractiveWithRisk(rt.BaseDir, askOpts, confirmTools, riskPolicy)
 				if code != 0 {
 					return exitCodeError{code: code}
 				}
 				return nil
 			}
-			code := runAskOnce(rt.BaseDir, strings.Join(args, " "), askOpts, confirmTools)
+			code := runAskOnceWithSession(rt.BaseDir, strings.Join(args, " "), askOpts, confirmTools, riskPolicy, nil)
 			if code != 0 {
 				return exitCodeError{code: code}
 			}
@@ -252,6 +257,7 @@ func addCobraSubcommands(root *cobra.Command, opts *flags) {
 	askCmd.Flags().StringVar(&askBaseURL, "base-url", "", "override base URL for selected provider")
 	askCmd.Flags().BoolVar(&askConfirmTools, "confirm-tools", true, "ask confirmation before agent runs a plugin/function/tool")
 	askCmd.Flags().BoolVar(&askNoConfirmTools, "no-confirm-tools", false, "disable confirmation before agent actions")
+	askCmd.Flags().StringVar(&askRiskPolicy, "risk-policy", riskPolicyNormal, "risk policy: strict|normal|off")
 	root.AddCommand(askCmd)
 }
 

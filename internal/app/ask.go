@@ -15,6 +15,11 @@ import (
 )
 
 const askMaxSteps = 4
+const (
+	riskPolicyStrict = "strict"
+	riskPolicyNormal = "normal"
+	riskPolicyOff    = "off"
+)
 
 type askActionRecord struct {
 	Step   int
@@ -24,29 +29,40 @@ type askActionRecord struct {
 	Result string
 }
 
-func parseLegacyAskArgs(args []string) (agent.AskOptions, bool, string, error) {
+func parseLegacyAskArgs(args []string) (agent.AskOptions, bool, string, string, error) {
 	var opts agent.AskOptions
 	confirmTools := true
+	riskPolicy := riskPolicyNormal
 	var promptParts []string
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
 		case "--provider":
 			if i+1 >= len(args) {
-				return opts, confirmTools, "", fmt.Errorf("missing value for --provider")
+				return opts, confirmTools, riskPolicy, "", fmt.Errorf("missing value for --provider")
 			}
 			opts.Provider = args[i+1]
 			i++
 		case "--model":
 			if i+1 >= len(args) {
-				return opts, confirmTools, "", fmt.Errorf("missing value for --model")
+				return opts, confirmTools, riskPolicy, "", fmt.Errorf("missing value for --model")
 			}
 			opts.Model = args[i+1]
 			i++
 		case "--base-url":
 			if i+1 >= len(args) {
-				return opts, confirmTools, "", fmt.Errorf("missing value for --base-url")
+				return opts, confirmTools, riskPolicy, "", fmt.Errorf("missing value for --base-url")
 			}
 			opts.BaseURL = args[i+1]
+			i++
+		case "--risk-policy":
+			if i+1 >= len(args) {
+				return opts, confirmTools, riskPolicy, "", fmt.Errorf("missing value for --risk-policy")
+			}
+			p, err := normalizeRiskPolicy(args[i+1])
+			if err != nil {
+				return opts, confirmTools, riskPolicy, "", err
+			}
+			riskPolicy = p
 			i++
 		case "--confirm-tools":
 			confirmTools = true
@@ -56,14 +72,14 @@ func parseLegacyAskArgs(args []string) (agent.AskOptions, bool, string, error) {
 			promptParts = append(promptParts, args[i])
 		}
 	}
-	return opts, confirmTools, strings.Join(promptParts, " "), nil
+	return opts, confirmTools, riskPolicy, strings.Join(promptParts, " "), nil
 }
 
 func runAskOnce(baseDir, prompt string, opts agent.AskOptions, confirmTools bool) int {
-	return runAskOnceWithSession(baseDir, prompt, opts, confirmTools, nil)
+	return runAskOnceWithSession(baseDir, prompt, opts, confirmTools, riskPolicyNormal, nil)
 }
 
-func runAskOnceWithSession(baseDir, prompt string, opts agent.AskOptions, confirmTools bool, previousPrompts []string) int {
+func runAskOnceWithSession(baseDir, prompt string, opts agent.AskOptions, confirmTools bool, riskPolicy string, previousPrompts []string) int {
 	catalog := buildPluginCatalog(baseDir)
 	toolsCatalog := buildToolsCatalog()
 	history := []askActionRecord{}
@@ -107,16 +123,16 @@ func runAskOnceWithSession(baseDir, prompt string, opts agent.AskOptions, confir
 			if strings.TrimSpace(decision.Reason) != "" {
 				fmt.Println("Reason:", decision.Reason)
 			}
+			risk, riskReason := assessDecisionRisk(decision)
+			fmt.Printf("%s %s (%s)\n", ui.Warn("Risk:"), strings.ToUpper(risk), riskReason)
 			fmt.Printf("Running plugin: %s", decision.Plugin)
 			if len(decision.Args) > 0 {
 				fmt.Printf(" %s", strings.Join(decision.Args, " "))
 			}
 			fmt.Println()
-			if confirmTools {
+			if shouldConfirmAction(confirmTools, riskPolicy, risk) {
 				reader := bufio.NewReader(os.Stdin)
-				fmt.Print(ui.Prompt("Confirm agent action? [Y/n]: "))
-				confirm := strings.ToLower(strings.TrimSpace(readLine(reader)))
-				if confirm == "n" || confirm == "no" {
+				if !confirmAgentAction(reader, risk) {
 					fmt.Println(ui.Warn("Canceled."))
 					if strings.TrimSpace(decision.Answer) != "" {
 						fmt.Println(decision.Answer)
@@ -161,15 +177,15 @@ func runAskOnceWithSession(baseDir, prompt string, opts agent.AskOptions, confir
 			if strings.TrimSpace(decision.Reason) != "" {
 				fmt.Println("Reason:", decision.Reason)
 			}
+			risk, riskReason := assessDecisionRisk(decision)
+			fmt.Printf("%s %s (%s)\n", ui.Warn("Risk:"), strings.ToUpper(risk), riskReason)
 			fmt.Println("Running tool:", toolName)
 			if len(decision.ToolArgs) > 0 {
 				fmt.Println("Tool args:", formatToolArgs(decision.ToolArgs))
 			}
-			if confirmTools {
+			if shouldConfirmAction(confirmTools, riskPolicy, risk) {
 				reader := bufio.NewReader(os.Stdin)
-				fmt.Print(ui.Prompt("Confirm agent action? [Y/n]: "))
-				confirm := strings.ToLower(strings.TrimSpace(readLine(reader)))
-				if confirm == "n" || confirm == "no" {
+				if !confirmAgentAction(reader, risk) {
 					fmt.Println(ui.Warn("Canceled."))
 					if strings.TrimSpace(decision.Answer) != "" {
 						fmt.Println(decision.Answer)
@@ -270,6 +286,10 @@ func decisionSignature(decision agent.DecisionResult) string {
 }
 
 func runAskInteractive(baseDir string, opts agent.AskOptions, confirmTools bool) int {
+	return runAskInteractiveWithRisk(baseDir, opts, confirmTools, riskPolicyNormal)
+}
+
+func runAskInteractiveWithRisk(baseDir string, opts agent.AskOptions, confirmTools bool, riskPolicy string) int {
 	session, err := agent.ResolveSessionProvider(opts)
 	if err != nil {
 		fmt.Println("Error:", err)
@@ -296,12 +316,76 @@ func runAskInteractive(baseDir string, opts agent.AskOptions, confirmTools bool)
 		case "/exit", "exit", "quit":
 			return 0
 		}
-		_ = runAskOnceWithSession(baseDir, prompt, sessionOpts, confirmTools, previousPrompts)
+		_ = runAskOnceWithSession(baseDir, prompt, sessionOpts, confirmTools, riskPolicy, previousPrompts)
 		previousPrompts = append(previousPrompts, prompt)
 		if len(previousPrompts) > 6 {
 			previousPrompts = previousPrompts[len(previousPrompts)-6:]
 		}
 	}
+}
+
+func normalizeRiskPolicy(raw string) (string, error) {
+	p := strings.ToLower(strings.TrimSpace(raw))
+	switch p {
+	case "", riskPolicyNormal:
+		return riskPolicyNormal, nil
+	case riskPolicyStrict, riskPolicyOff:
+		return p, nil
+	default:
+		return "", fmt.Errorf("invalid --risk-policy %q (use strict|normal|off)", raw)
+	}
+}
+
+func shouldConfirmAction(confirmTools bool, riskPolicy, risk string) bool {
+	switch riskPolicy {
+	case riskPolicyOff:
+		return confirmTools
+	case riskPolicyStrict:
+		return true
+	default:
+		return confirmTools || risk == "high"
+	}
+}
+
+func confirmAgentAction(reader *bufio.Reader, risk string) bool {
+	if risk == "high" {
+		fmt.Print(ui.Prompt("Confirm HIGH risk action? [y/N]: "))
+		confirm := strings.ToLower(strings.TrimSpace(readLine(reader)))
+		return confirm == "y" || confirm == "yes"
+	}
+	fmt.Print(ui.Prompt("Confirm agent action? [Y/n]: "))
+	confirm := strings.ToLower(strings.TrimSpace(readLine(reader)))
+	return !(confirm == "n" || confirm == "no")
+}
+
+func assessDecisionRisk(decision agent.DecisionResult) (string, string) {
+	if decision.Action == "run_tool" {
+		tool := strings.ToLower(strings.TrimSpace(decision.Tool))
+		switch tool {
+		case "clean", "c":
+			apply := strings.ToLower(strings.TrimSpace(decision.ToolArgs["apply"]))
+			if apply == "1" || apply == "true" || apply == "yes" || apply == "y" {
+				return "high", "delete empty directories"
+			}
+			return "low", "preview only"
+		case "rename", "r":
+			return "medium", "batch rename files"
+		case "backup", "b":
+			return "medium", "writes backup archive"
+		case "note", "n":
+			return "low", "append note"
+		default:
+			return "low", "read/inspect operation"
+		}
+	}
+	if decision.Action == "run_plugin" {
+		name := strings.ToLower(strings.TrimSpace(decision.Plugin))
+		if strings.Contains(name, "reset") || strings.Contains(name, "delete") || strings.Contains(name, "drop") || strings.Contains(name, "rm") {
+			return "high", "plugin may perform destructive operations"
+		}
+		return "medium", "external plugin execution"
+	}
+	return "low", "response only"
 }
 
 func buildPluginCatalog(baseDir string) string {

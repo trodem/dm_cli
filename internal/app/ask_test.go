@@ -8,10 +8,11 @@ import (
 )
 
 func TestParseLegacyAskArgs(t *testing.T) {
-	opts, confirm, prompt, err := parseLegacyAskArgs([]string{
+	opts, confirm, riskPolicy, prompt, err := parseLegacyAskArgs([]string{
 		"--provider", "ollama",
 		"--model", "deepseek-coder-v2:latest",
 		"--base-url", "http://127.0.0.1:11434",
+		"--risk-policy", "strict",
 		"--no-confirm-tools",
 		"spiegami", "questo", "errore",
 	})
@@ -30,13 +31,16 @@ func TestParseLegacyAskArgs(t *testing.T) {
 	if confirm {
 		t.Fatalf("expected confirmTools=false")
 	}
+	if riskPolicy != riskPolicyStrict {
+		t.Fatalf("expected strict risk policy, got %q", riskPolicy)
+	}
 	if prompt != "spiegami questo errore" {
 		t.Fatalf("unexpected prompt: %q", prompt)
 	}
 }
 
 func TestParseLegacyAskArgsMissingProviderValue(t *testing.T) {
-	_, _, _, err := parseLegacyAskArgs([]string{"--provider"})
+	_, _, _, _, err := parseLegacyAskArgs([]string{"--provider"})
 	if err == nil {
 		t.Fatal("expected error for missing --provider value")
 	}
@@ -74,5 +78,29 @@ func TestDecisionSignature(t *testing.T) {
 	})
 	if toolSig == "" || !strings.Contains(toolSig, "run_tool|search|") {
 		t.Fatalf("unexpected tool signature: %q", toolSig)
+	}
+}
+
+func TestNormalizeRiskPolicy(t *testing.T) {
+	v, err := normalizeRiskPolicy("off")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if v != riskPolicyOff {
+		t.Fatalf("unexpected policy: %q", v)
+	}
+	if _, err := normalizeRiskPolicy("invalid"); err == nil {
+		t.Fatal("expected error for invalid risk policy")
+	}
+}
+
+func TestAssessDecisionRisk(t *testing.T) {
+	risk, _ := assessDecisionRisk(agent.DecisionResult{
+		Action:   "run_tool",
+		Tool:     "clean",
+		ToolArgs: map[string]string{"apply": "true"},
+	})
+	if risk != "high" {
+		t.Fatalf("expected high risk, got %q", risk)
 	}
 }
