@@ -373,6 +373,18 @@ PowerShell profile function bridge:
 - Unreleased: Consolidate configuration around `dm.json` + plugins/tools.
 - v0.1.0: Initial public version.
 
+Recent updates (2026-02-18):
+- `02c8c22` Refactor app modules and optimize tool paging:
+  - split `internal/app` into focused files (`ask`, `plugin menu`, `profile ops`)
+  - add in-process caches for plugin catalog/info and paged `search`/`recent` flows
+  - add benchmark suites for `tools` and `internal/plugins`
+- `f2d847a` Harden cache invalidation and paging tests:
+  - add mtime-aware invalidation for plugin cache entries
+  - add tests for cache invalidation and paging cache behavior (TTL, eviction, loader error)
+- `274ec5f` Add real-path benchmarks for tools:
+  - add `DM_BENCH_BASE` benchmarks for real filesystem workloads
+  - document real-path benchmark commands in README
+
 ## Performance Benchmarks
 Local benchmark snapshot (Windows, Ryzen 9 5900X):
 
