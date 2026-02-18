@@ -3,3 +3,4 @@ dist/*
 *.cache.json
 *.agent.json
 dm.agent.json
+*.exe
