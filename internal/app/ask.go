@@ -60,12 +60,16 @@ func parseLegacyAskArgs(args []string) (agent.AskOptions, bool, string, error) {
 }
 
 func runAskOnce(baseDir, prompt string, opts agent.AskOptions, confirmTools bool) int {
+	return runAskOnceWithSession(baseDir, prompt, opts, confirmTools, nil)
+}
+
+func runAskOnceWithSession(baseDir, prompt string, opts agent.AskOptions, confirmTools bool, previousPrompts []string) int {
 	catalog := buildPluginCatalog(baseDir)
 	toolsCatalog := buildToolsCatalog()
 	history := []askActionRecord{}
 	lastSignature := ""
 	for step := 1; step <= askMaxSteps; step++ {
-		decisionPrompt := buildAskPlannerPrompt(prompt, history)
+		decisionPrompt := buildAskPlannerPrompt(prompt, history, previousPrompts)
 		decision, err := agent.DecideWithPlugins(decisionPrompt, catalog, toolsCatalog, opts)
 		if err != nil {
 			fmt.Println("Error:", err)
@@ -216,26 +220,36 @@ func runAskOnce(baseDir, prompt string, opts agent.AskOptions, confirmTools bool
 	return 0
 }
 
-func buildAskPlannerPrompt(original string, history []askActionRecord) string {
+func buildAskPlannerPrompt(original string, history []askActionRecord, previousPrompts []string) string {
 	base := strings.TrimSpace(original)
-	if len(history) == 0 {
+	if len(history) == 0 && len(previousPrompts) == 0 {
 		return base
 	}
 	lines := []string{
 		"Original user request:",
 		base,
-		"",
-		"Actions already executed in this session:",
 	}
-	for _, h := range history {
-		line := fmt.Sprintf("- step %d: %s target=%s", h.Step, h.Action, h.Target)
-		if strings.TrimSpace(h.Args) != "" {
-			line += " args=" + h.Args
+	if len(previousPrompts) > 0 {
+		lines = append(lines, "", "Previous prompts in this interactive session:")
+		for i, p := range previousPrompts {
+			if strings.TrimSpace(p) == "" {
+				continue
+			}
+			lines = append(lines, fmt.Sprintf("- prev %d: %s", i+1, strings.TrimSpace(p)))
 		}
-		if strings.TrimSpace(h.Result) != "" {
-			line += " result=" + h.Result
+	}
+	if len(history) > 0 {
+		lines = append(lines, "", "Actions already executed in this session:")
+		for _, h := range history {
+			line := fmt.Sprintf("- step %d: %s target=%s", h.Step, h.Action, h.Target)
+			if strings.TrimSpace(h.Args) != "" {
+				line += " args=" + h.Args
+			}
+			if strings.TrimSpace(h.Result) != "" {
+				line += " result=" + h.Result
+			}
+			lines = append(lines, line)
 		}
-		lines = append(lines, line)
 	}
 	lines = append(lines,
 		"",
@@ -267,6 +281,7 @@ func runAskInteractive(baseDir string, opts agent.AskOptions, confirmTools bool)
 	fmt.Println("Ask mode. Type your question.")
 	fmt.Println("Exit commands: /exit, exit, quit")
 	reader := bufio.NewReader(os.Stdin)
+	previousPrompts := []string{}
 	for {
 		fmt.Print(ui.Warn(promptLabel))
 		line, readErr := reader.ReadString('\n')
@@ -281,7 +296,11 @@ func runAskInteractive(baseDir string, opts agent.AskOptions, confirmTools bool)
 		case "/exit", "exit", "quit":
 			return 0
 		}
-		_ = runAskOnce(baseDir, prompt, sessionOpts, confirmTools)
+		_ = runAskOnceWithSession(baseDir, prompt, sessionOpts, confirmTools, previousPrompts)
+		previousPrompts = append(previousPrompts, prompt)
+		if len(previousPrompts) > 6 {
+			previousPrompts = previousPrompts[len(previousPrompts)-6:]
+		}
 	}
 }
 

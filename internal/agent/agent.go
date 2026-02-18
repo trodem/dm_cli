@@ -230,7 +230,18 @@ func DecideWithPlugins(userPrompt string, pluginCatalog string, toolCatalog stri
 	}
 	parsed, err := parseDecisionJSON(raw.Text)
 	if err != nil {
-		// fallback to plain answer if the model returned non-JSON text
+		repaired, repErr := askDecisionJSONRepair(raw.Text, opts)
+		if repErr == nil {
+			if parsed2, p2Err := parseDecisionJSON(repaired.Text); p2Err == nil {
+				parsed2.Provider = repaired.Provider
+				parsed2.Model = repaired.Model
+				if parsed2.Action != "run_plugin" && parsed2.Action != "run_tool" {
+					parsed2.Action = "answer"
+				}
+				return parsed2, nil
+			}
+		}
+		// fallback to plain answer if model never returned valid JSON
 		return DecisionResult{
 			Action:   "answer",
 			Answer:   raw.Text,
@@ -244,6 +255,21 @@ func DecideWithPlugins(userPrompt string, pluginCatalog string, toolCatalog stri
 		parsed.Action = "answer"
 	}
 	return parsed, nil
+}
+
+func askDecisionJSONRepair(rawText string, opts AskOptions) (AskResult, error) {
+	repairPrompt := strings.Join([]string{
+		"Convert the following text to valid JSON only.",
+		"Do not add markdown fences.",
+		"Use exactly one of these schemas:",
+		`{"action":"answer","answer":"text"}`,
+		`{"action":"run_plugin","plugin":"name","args":["arg1"],"reason":"why","answer":"optional text before/after run"}`,
+		`{"action":"run_tool","tool":"name","tool_args":{"key":"value"},"reason":"why","answer":"optional text before/after run"}`,
+		"",
+		"Text:",
+		strings.TrimSpace(rawText),
+	}, "\n")
+	return AskWithOptions(repairPrompt, opts)
 }
 
 var jsonBlockRe = regexp.MustCompile("(?s)\\{.*\\}")

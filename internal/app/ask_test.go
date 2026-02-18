@@ -46,9 +46,12 @@ func TestBuildAskPlannerPromptWithHistory(t *testing.T) {
 	history := []askActionRecord{
 		{Step: 1, Action: "run_tool", Target: "search", Args: "name=report, ext=pdf", Result: "ok"},
 	}
-	got := buildAskPlannerPrompt("trova i pdf recenti", history)
+	got := buildAskPlannerPrompt("trova i pdf recenti", history, []string{"prima richiesta"})
 	if !strings.Contains(got, "Original user request:") {
 		t.Fatalf("expected original request section, got: %s", got)
+	}
+	if !strings.Contains(got, "Previous prompts in this interactive session:") {
+		t.Fatalf("expected previous prompts section, got: %s", got)
 	}
 	if !strings.Contains(got, "step 1: run_tool target=search") {
 		t.Fatalf("expected history section, got: %s", got)
