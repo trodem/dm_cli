@@ -116,6 +116,7 @@ function stibs_db_query {
         [string]$Sql
     )
 
+    _assert_command_available -Name docker
     $cfg = _stibs_db_get_config
 
     docker exec -i $($cfg.Container) `
@@ -165,6 +166,7 @@ function stibs_db_count {
 Apre shell MariaDB nel container.
 #>
 function stibs_db_shell {
+    _assert_command_available -Name docker
     $cfg = _stibs_db_get_config
     docker exec -it $($cfg.Container) `
         mysql -u$($cfg.User) -p$($cfg.Password) $($cfg.Database)
@@ -183,6 +185,7 @@ function stibs_db_export_dump {
         [string]$Output = "$env:USERPROFILE\Downloads"
     )
 
+    _assert_command_available -Name docker
     $timestamp = Get-Date -Format "yyyyMMdd-HHmmss"
 
     if ($Output -match '\.zip$') {
@@ -224,15 +227,32 @@ function stibs_db_export_dump {
 <#
 .SYNOPSIS
 Ripristina il database MariaDB da un dump .zip.
+.PARAMETER ZipFile
+Percorso del file zip contenente il dump SQL.
+.PARAMETER Force
+Salta la conferma interattiva prima del drop/recreate database.
+.EXAMPLE
+dm stibs_db_import_dump C:\Users\me\Downloads\stibs-20260218-101010.zip
+.EXAMPLE
+dm stibs_db_import_dump C:\Users\me\Downloads\stibs-20260218-101010.zip -Force
 #>
 function stibs_db_import_dump {
     param(
         [Parameter(Mandatory)]
-        [string]$ZipFile
+        [string]$ZipFile,
+        [switch]$Force
     )
 
-    if (-not (Test-Path $ZipFile)) {
+    _assert_command_available -Name docker
+    if (-not (Test-Path -LiteralPath $ZipFile)) {
         throw "File non trovato: $ZipFile"
+    }
+
+    if (-not $Force) {
+        if (-not (_confirm_action -Prompt "This will drop and recreate database. Continue")) {
+            Write-Output "Operazione annullata."
+            return
+        }
     }
 
     $tempDir = Join-Path $env:TEMP ("dbrestore_" + (Get-Date -Format "yyyyMMddHHmmss"))
@@ -274,6 +294,7 @@ function stibs_db_mysql_query {
         [Parameter(Mandatory)][string]$Query
     )
 
+    _assert_command_available -Name docker
     docker exec -i $Container mysql -u$User -p$Password $Database -e $Query
 }
 
@@ -305,6 +326,7 @@ function stibs_db_mysql_dump {
         [Parameter(Mandatory)][string]$Output
     )
 
+    _assert_command_available -Name docker
     docker exec $Container mysqldump -u$User -p$Password $Database > $Output
 }
 
@@ -326,6 +348,7 @@ function stibs_db_container {
 Recupera variabili ambiente MariaDB.
 #>
 function stibs_db_env {
+    _assert_command_available -Name docker
     $cfg = _stibs_db_get_config
     docker inspect $($cfg.Container) |
         ConvertFrom-Json |

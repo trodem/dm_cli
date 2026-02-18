@@ -43,3 +43,27 @@ function _assert_path_exists {
         throw "Required path '$Path' does not exist."
     }
 }
+
+<#
+.SYNOPSIS
+Ask for a yes/no confirmation before a risky action.
+.DESCRIPTION
+Returns $true only when the user explicitly confirms with y/yes.
+.PARAMETER Prompt
+Message shown to the user.
+.EXAMPLE
+if (-not (_confirm_action -Prompt "Continue?")) { return }
+#>
+function _confirm_action {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Prompt
+    )
+
+    $answer = Read-Host "$Prompt [y/N]"
+    if ([string]::IsNullOrWhiteSpace($answer)) {
+        return $false
+    }
+
+    return $answer.Trim().ToLowerInvariant() -in @("y", "yes")
+}
