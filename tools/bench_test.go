@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -27,6 +28,22 @@ func benchmarkDataset(b *testing.B, files int) string {
 		if err := os.WriteFile(p, []byte("x"), 0o644); err != nil {
 			b.Fatal(err)
 		}
+	}
+	return base
+}
+
+func realBenchmarkBase(b *testing.B) string {
+	b.Helper()
+	base := strings.TrimSpace(os.Getenv("DM_BENCH_BASE"))
+	if base == "" {
+		b.Skip("set DM_BENCH_BASE to run real-path benchmarks")
+	}
+	info, err := os.Stat(base)
+	if err != nil {
+		b.Skipf("DM_BENCH_BASE not accessible: %v", err)
+	}
+	if !info.IsDir() {
+		b.Skip("DM_BENCH_BASE is not a directory")
 	}
 	return base
 }
@@ -91,6 +108,30 @@ func BenchmarkSearchPagingCacheHit(b *testing.B) {
 	}
 }
 
+func BenchmarkSearchFindRealPath(b *testing.B) {
+	base := realBenchmarkBase(b)
+	namePart := strings.TrimSpace(os.Getenv("DM_BENCH_NAME"))
+	ext := strings.TrimSpace(os.Getenv("DM_BENCH_EXT"))
+	opts := filesearch.Options{
+		BasePath: base,
+		NamePart: namePart,
+		Ext:      ext,
+		SortBy:   "name",
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		results, err := filesearch.Find(opts)
+		if err != nil {
+			b.Fatal(err)
+		}
+		// Real-path benchmark should have some files to be meaningful.
+		if len(results) == 0 {
+			b.Fatal("no files found in DM_BENCH_BASE with current filters")
+		}
+	}
+}
+
 func BenchmarkRecentCollectSorted(b *testing.B) {
 	base := benchmarkDataset(b, 4000)
 
@@ -131,6 +172,21 @@ func BenchmarkRecentPagingCacheHit(b *testing.B) {
 		}
 		if len(got) == 0 {
 			b.Fatal("expected cached items")
+		}
+	}
+}
+
+func BenchmarkRecentCollectSortedRealPath(b *testing.B) {
+	base := realBenchmarkBase(b)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		items, err := collectRecentSorted(base)
+		if err != nil {
+			b.Fatal(err)
+		}
+		if len(items) == 0 {
+			b.Fatal("no files found in DM_BENCH_BASE")
 		}
 	}
 }

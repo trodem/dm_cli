@@ -382,6 +382,15 @@ go test ./tools -run ^$ -bench Benchmark -benchmem
 go test ./internal/plugins -run ^$ -bench Benchmark -benchmem
 ```
 
+Real-path benchmarks (optional):
+```powershell
+$env:DM_BENCH_BASE="E:\path\to\folder"
+# optional filters for search benchmark:
+$env:DM_BENCH_NAME="report"
+$env:DM_BENCH_EXT="pdf"
+go test ./tools -run ^$ -bench "Benchmark(SearchFindRealPath|RecentCollectSortedRealPath)$" -benchmem
+```
+
 Highlights:
 - `search` full scan (`BenchmarkSearchFind`): ~42.6 ms/op
 - `search` paging cache hit (`BenchmarkSearchPagingCacheHit`): ~5.6 us/op
