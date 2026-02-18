@@ -20,6 +20,14 @@ $ErrorActionPreference = "Stop"
 # Internal Helpers
 # -----------------------------------------------------------------------------
 
+<#
+.SYNOPSIS
+Invoke _assert_path_exists.
+.DESCRIPTION
+Helper/command function for _assert_path_exists.
+.EXAMPLE
+dm _assert_path_exists
+#>
 function _assert_path_exists {
     param(
         [Parameter(Mandatory = $true)]
@@ -30,6 +38,14 @@ function _assert_path_exists {
     }
 }
 
+<#
+.SYNOPSIS
+Invoke _get_systran_api_key.
+.DESCRIPTION
+Helper/command function for _get_systran_api_key.
+.EXAMPLE
+dm _get_systran_api_key
+#>
 function _get_systran_api_key {
     param(
         [string]$ApiKey
@@ -46,6 +62,14 @@ function _get_systran_api_key {
     throw "Systran API key not provided. Use -ApiKey or set SYSTRAN_API_KEY environment variable."
 }
 
+<#
+.SYNOPSIS
+Invoke _invoke_systran_request.
+.DESCRIPTION
+Helper/command function for _invoke_systran_request.
+.EXAMPLE
+dm _invoke_systran_request
+#>
 function _invoke_systran_request {
     param(
         [Parameter(Mandatory = $true)]

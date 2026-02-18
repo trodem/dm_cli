@@ -8,6 +8,14 @@ param(
     [string]$ArgsJson = "[]"
 )
 
+<#
+.SYNOPSIS
+Invoke _to_array.
+.DESCRIPTION
+Helper/command function for _to_array.
+.EXAMPLE
+dm _to_array
+#>
 function _to_array {
     param([object]$Value)
     if ($null -eq $Value) { return @() }

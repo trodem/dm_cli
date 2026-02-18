@@ -714,6 +714,14 @@ function sys_events {
 }
 
 
+<#
+.SYNOPSIS
+Invoke sys_wifi_dev.
+.DESCRIPTION
+Helper/command function for sys_wifi_dev.
+.EXAMPLE
+dm sys_wifi_dev
+#>
 function sys_wifi_dev {
     param(
         [Parameter(Position = 0)]
@@ -747,6 +755,14 @@ function sys_wifi_dev {
     }
 }
 
+<#
+.SYNOPSIS
+Invoke sys_wifi_stadlerwlan.
+.DESCRIPTION
+Helper/command function for sys_wifi_stadlerwlan.
+.EXAMPLE
+dm sys_wifi_stadlerwlan
+#>
 function sys_wifi_stadlerwlan {
     param(
         [Parameter(Position = 0)]
@@ -781,6 +797,14 @@ function sys_wifi_stadlerwlan {
 }
 
 
+<#
+.SYNOPSIS
+Invoke sys_wifi_switch.
+.DESCRIPTION
+Helper/command function for sys_wifi_switch.
+.EXAMPLE
+dm sys_wifi_switch
+#>
 function sys_wifi_switch {
     param(
         [Parameter(Mandatory = $true, Position = 0)]

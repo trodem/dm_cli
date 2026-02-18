@@ -17,6 +17,14 @@
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
+<#
+.SYNOPSIS
+Invoke browser_close_all.
+.DESCRIPTION
+Helper/command function for browser_close_all.
+.EXAMPLE
+dm browser_close_all
+#>
 function browser_close_all {
     param()
 
@@ -64,6 +72,14 @@ function browser_close_all {
 }
 
 
+<#
+.SYNOPSIS
+Invoke browser_standard.
+.DESCRIPTION
+Helper/command function for browser_standard.
+.EXAMPLE
+dm browser_standard
+#>
 function browser_standard {
     param()
 
@@ -100,6 +116,14 @@ function browser_standard {
 # -----------------------------------------------------------------------------
 # Open any URL in default browser
 # -----------------------------------------------------------------------------
+<#
+.SYNOPSIS
+Invoke browser_open.
+.DESCRIPTION
+Helper/command function for browser_open.
+.EXAMPLE
+dm browser_open
+#>
 function browser_open {
     param(
         [Parameter(Mandatory = $true, Position = 0)]
@@ -118,6 +142,14 @@ function browser_open {
 # -----------------------------------------------------------------------------
 # Open localhost with port
 # -----------------------------------------------------------------------------
+<#
+.SYNOPSIS
+Invoke browser_localhost.
+.DESCRIPTION
+Helper/command function for browser_localhost.
+.EXAMPLE
+dm browser_localhost
+#>
 function browser_localhost {
     param(
         [Parameter(Mandatory = $true, Position = 0)]
@@ -149,6 +181,14 @@ function browser_localhost {
 # -----------------------------------------------------------------------------
 # Test if localhost port is open
 # -----------------------------------------------------------------------------
+<#
+.SYNOPSIS
+Invoke browser_test_port.
+.DESCRIPTION
+Helper/command function for browser_test_port.
+.EXAMPLE
+dm browser_test_port
+#>
 function browser_test_port {
     param(
         [Parameter(Mandatory = $true, Position = 0)]
@@ -173,6 +213,14 @@ function browser_test_port {
 # -----------------------------------------------------------------------------
 # Wait for localhost port and open browser
 # -----------------------------------------------------------------------------
+<#
+.SYNOPSIS
+Invoke browser_wait_and_open.
+.DESCRIPTION
+Helper/command function for browser_wait_and_open.
+.EXAMPLE
+dm browser_wait_and_open
+#>
 function browser_wait_and_open {
     param(
         [Parameter(Mandatory = $true, Position = 0)]
@@ -220,6 +268,14 @@ function browser_wait_and_open {
 # -----------------------------------------------------------------------------
 # Open multiple URLs
 # -----------------------------------------------------------------------------
+<#
+.SYNOPSIS
+Invoke browser_open_many.
+.DESCRIPTION
+Helper/command function for browser_open_many.
+.EXAMPLE
+dm browser_open_many
+#>
 function browser_open_many {
     param(
         [Parameter(Mandatory = $true, Position = 0)]

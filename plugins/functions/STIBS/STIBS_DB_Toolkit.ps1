@@ -40,6 +40,14 @@
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
+<#
+.SYNOPSIS
+Invoke _stibs_db_get_config.
+.DESCRIPTION
+Helper/command function for _stibs_db_get_config.
+.EXAMPLE
+dm _stibs_db_get_config
+#>
 function _stibs_db_get_config {
     $cfg = _stibs_db_config
     if ($null -eq $cfg) {
@@ -48,6 +56,14 @@ function _stibs_db_get_config {
     return $cfg
 }
 
+<#
+.SYNOPSIS
+Invoke _stibs_db_assert_identifier.
+.DESCRIPTION
+Helper/command function for _stibs_db_assert_identifier.
+.EXAMPLE
+dm _stibs_db_assert_identifier
+#>
 function _stibs_db_assert_identifier {
     param(
         [Parameter(Mandatory = $true)]
@@ -62,17 +78,41 @@ function _stibs_db_assert_identifier {
     return $Value
 }
 
+<#
+.SYNOPSIS
+Invoke _stibs_db_escape_sql_literal.
+.DESCRIPTION
+Helper/command function for _stibs_db_escape_sql_literal.
+.EXAMPLE
+dm _stibs_db_escape_sql_literal
+#>
 function _stibs_db_escape_sql_literal {
     param([Parameter(Mandatory = $true)][string]$Value)
     return $Value.Replace("'", "''")
 }
 
+<#
+.SYNOPSIS
+Invoke _stibs_db_escape_like.
+.DESCRIPTION
+Helper/command function for _stibs_db_escape_like.
+.EXAMPLE
+dm _stibs_db_escape_like
+#>
 function _stibs_db_escape_like {
     param([Parameter(Mandatory = $true)][string]$Value)
     $escaped = $Value.Replace("\", "\\").Replace("%", "\%").Replace("_", "\_")
     return $escaped.Replace("'", "''")
 }
 
+<#
+.SYNOPSIS
+Invoke _stibs_db_assert_limit.
+.DESCRIPTION
+Helper/command function for _stibs_db_assert_limit.
+.EXAMPLE
+dm _stibs_db_assert_limit
+#>
 function _stibs_db_assert_limit {
     param(
         [int]$Value,

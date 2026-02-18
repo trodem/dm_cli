@@ -3,6 +3,14 @@
 # All notes saved in one file. Input via parameters only.
 # =============================================================================
 
+<#
+.SYNOPSIS
+Invoke notes_file.
+.DESCRIPTION
+Helper/command function for notes_file.
+.EXAMPLE
+dm notes_file
+#>
 function notes_file {
     $base = Join-Path $env:USERPROFILE "notes"
     if (-not (Test-Path $base)) { New-Item -ItemType Directory -Path $base | Out-Null }

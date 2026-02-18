@@ -20,6 +20,14 @@
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
+<#
+.SYNOPSIS
+Invoke _dc.
+.DESCRIPTION
+Helper/command function for _dc.
+.EXAMPLE
+dm _dc
+#>
 function _dc {
     $composeFile = _stibs_compose_file
     docker compose -f $composeFile @args
