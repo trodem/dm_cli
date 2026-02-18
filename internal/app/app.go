@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"cli/internal/config"
 	"cli/internal/doctor"
@@ -26,9 +27,12 @@ func runLegacy(args []string) int {
 	cfg := rt.Config
 
 	if len(rest) == 0 {
+		exeBuiltAt, _ := executableBuildTime()
 		ui.PrintSplash(ui.SplashData{
-			BaseDir: baseDir,
-			Version: Version,
+			BaseDir:    baseDir,
+			Version:    Version,
+			ExeBuiltAt: exeBuiltAt,
+			Now:        time.Now().Format("2006-01-02 15:04:05"),
 		})
 		return 0
 	}
@@ -189,6 +193,18 @@ func exeDir() (string, error) {
 		return "", err
 	}
 	return filepath.Dir(p), nil
+}
+
+func executableBuildTime() (string, error) {
+	exePath, err := os.Executable()
+	if err != nil {
+		return "", err
+	}
+	info, err := os.Stat(exePath)
+	if err != nil {
+		return "", err
+	}
+	return info.ModTime().Local().Format("2006-01-02 15:04:05"), nil
 }
 
 func fileExists(path string) bool {
@@ -607,6 +623,3 @@ func min3(a, b, c int) int {
 	}
 	return c
 }
-
-
-

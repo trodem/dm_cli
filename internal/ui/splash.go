@@ -7,8 +7,10 @@ import (
 )
 
 type SplashData struct {
-	BaseDir string
-	Version string
+	BaseDir    string
+	Version    string
+	ExeBuiltAt string
+	Now        string
 }
 
 func PrintSplash(d SplashData) {
@@ -19,6 +21,12 @@ func PrintSplash(d SplashData) {
 	fmt.Println(Muted("---------"))
 	fmt.Printf("%s %s\n", Muted("Base dir   :"), d.BaseDir)
 	fmt.Printf("%s %s\n", Muted("Version    :"), d.Version)
+	if strings.TrimSpace(d.ExeBuiltAt) != "" {
+		fmt.Printf("%s %s\n", Muted("Exe built  :"), d.ExeBuiltAt)
+	}
+	if strings.TrimSpace(d.Now) != "" {
+		fmt.Printf("%s %s\n", Muted("Now        :"), d.Now)
+	}
 	fmt.Println()
 	fmt.Println(Accent("Quick Start"))
 	fmt.Println(Muted("-----------"))

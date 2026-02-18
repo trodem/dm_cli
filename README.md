@@ -20,6 +20,7 @@ Small personal CLI to jump to folders and run project commands.
 - Run global aliases
 - Run project actions
 - Interactive menu for targets
+- Splash shows version, executable build time, and current time
 - Config splitting with includes and profiles
 - Plugins (scripts) support
 - Validation and list/add commands
