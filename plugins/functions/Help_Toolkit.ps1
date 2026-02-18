@@ -44,15 +44,7 @@ Extracts prefix from function name.
 .DESCRIPTION
 Returns prefix portion before first underscore.
 .PARAMETER Name
-<#
-.SYNOPSIS
-Invoke name.
-.DESCRIPTION
-Helper/command function for name.
-.EXAMPLE
-dm name
-#>
-Function name.
+Target function name.
 #>
 function _help_get_prefix {
     param(
@@ -136,15 +128,7 @@ Check if toolkit function exists.
 .DESCRIPTION
 Returns true if function exists and follows toolkit naming convention.
 .PARAMETER Name
-<#
-.SYNOPSIS
-Invoke name.
-.DESCRIPTION
-Helper/command function for name.
-.EXAMPLE
-dm name
-#>
-Function name.
+Target function name.
 .EXAMPLE
 help_exists -Name sys_uptime
 #>
@@ -172,15 +156,7 @@ Show help for a toolkit function.
 .DESCRIPTION
 Displays comment-based help for specified toolkit function.
 .PARAMETER Name
-<#
-.SYNOPSIS
-Invoke name.
-.DESCRIPTION
-Helper/command function for name.
-.EXAMPLE
-dm name
-#>
-Function name.
+Target function name.
 .EXAMPLE
 help_function -Name sys_uptime
 #>
@@ -203,15 +179,7 @@ Show parameters of a toolkit function.
 .DESCRIPTION
 Returns parameter metadata for specified function.
 .PARAMETER Name
-<#
-.SYNOPSIS
-Invoke name.
-.DESCRIPTION
-Helper/command function for name.
-.EXAMPLE
-dm name
-#>
-Function name.
+Target function name.
 .EXAMPLE
 help_parameters -Name sys_ping
 #>
@@ -235,15 +203,7 @@ Show examples of a toolkit function.
 .DESCRIPTION
 Displays example section from comment-based help.
 .PARAMETER Name
-<#
-.SYNOPSIS
-Invoke name.
-.DESCRIPTION
-Helper/command function for name.
-.EXAMPLE
-dm name
-#>
-Function name.
+Target function name.
 .EXAMPLE
 help_examples -Name sys_ping
 #>
@@ -270,15 +230,7 @@ Show where a toolkit function is defined.
 .DESCRIPTION
 Returns source file or scriptblock information.
 .PARAMETER Name
-<#
-.SYNOPSIS
-Invoke name.
-.DESCRIPTION
-Helper/command function for name.
-.EXAMPLE
-dm name
-#>
-Function name.
+Target function name.
 .EXAMPLE
 help_where -Name sys_uptime
 #>
@@ -309,15 +261,7 @@ Return source code of a toolkit function.
 .DESCRIPTION
 Outputs the scriptblock definition text.
 .PARAMETER Name
-<#
-.SYNOPSIS
-Invoke name.
-.DESCRIPTION
-Helper/command function for name.
-.EXAMPLE
-dm name
-#>
-Function name.
+Target function name.
 .EXAMPLE
 help_source -Name sys_uptime
 #>
@@ -425,3 +369,4 @@ function help_builtin_info {
         Syntax      = ($help.Syntax | Out-String).Trim()
     }
 }
+
