@@ -351,6 +351,26 @@ PowerShell profile function bridge:
 - CI runs `PSScriptAnalyzer` in non-blocking mode and validates help blocks for all discovered functions.
 - Git function quick reference: `docs/git-cheatsheet.md` (generated from `plugins/functions/git.ps1`).
 
+Toolkit generator (`dm-toolkit-gen`) for external use:
+- Build:
+```powershell
+go build -o dist/dm-toolkit-gen.exe ./cmd/dm-toolkit-gen
+```
+- Optional placement next to runtime plugins:
+```powershell
+Copy-Item dist/dm-toolkit-gen.exe plugins/dm-toolkit-gen.exe -Force
+```
+- Commands:
+```powershell
+.\plugins\dm-toolkit-gen.exe init --name MSWord --prefix word --category office
+.\plugins\dm-toolkit-gen.exe add --file plugins/functions/office/MSWord_Toolkit.ps1 --prefix word --func export_pdf --param InputPath --param OutputPath --confirm --require-helper _confirm_action --require-var DM_WORD_TEMPLATE=normal.dotm
+.\plugins\dm-toolkit-gen.exe validate
+```
+- Behavior:
+  - auto-detects repo root from current directory or executable location (use `--repo` to override)
+  - can ensure shared helpers in `plugins/utils.ps1`
+  - can ensure shared variables in `plugins/variables.ps1` (managed region `dm-toolkit-gen:variables`)
+
 ## Project Layout
 ```
 .
