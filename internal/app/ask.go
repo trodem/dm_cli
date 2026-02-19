@@ -123,13 +123,9 @@ func runAskOnceWithSession(baseDir, prompt string, opts agent.AskOptions, confir
 			if strings.TrimSpace(decision.Reason) != "" {
 				fmt.Println("Reason:", decision.Reason)
 			}
+			fmt.Printf("%s %d/%d: %s\n", ui.Accent("Plan step"), step, askMaxSteps, plannedActionSummary(decision))
 			risk, riskReason := assessDecisionRisk(decision)
 			fmt.Printf("%s %s (%s)\n", ui.Warn("Risk:"), strings.ToUpper(risk), riskReason)
-			fmt.Printf("Running plugin: %s", decision.Plugin)
-			if len(decision.Args) > 0 {
-				fmt.Printf(" %s", strings.Join(decision.Args, " "))
-			}
-			fmt.Println()
 			if shouldConfirmAction(confirmTools, riskPolicy, risk) {
 				reader := bufio.NewReader(os.Stdin)
 				if !confirmAgentAction(reader, risk) {
@@ -177,12 +173,9 @@ func runAskOnceWithSession(baseDir, prompt string, opts agent.AskOptions, confir
 			if strings.TrimSpace(decision.Reason) != "" {
 				fmt.Println("Reason:", decision.Reason)
 			}
+			fmt.Printf("%s %d/%d: %s\n", ui.Accent("Plan step"), step, askMaxSteps, plannedActionSummary(decision))
 			risk, riskReason := assessDecisionRisk(decision)
 			fmt.Printf("%s %s (%s)\n", ui.Warn("Risk:"), strings.ToUpper(risk), riskReason)
-			fmt.Println("Running tool:", toolName)
-			if len(decision.ToolArgs) > 0 {
-				fmt.Println("Tool args:", formatToolArgs(decision.ToolArgs))
-			}
 			if shouldConfirmAction(confirmTools, riskPolicy, risk) {
 				reader := bufio.NewReader(os.Stdin)
 				if !confirmAgentAction(reader, risk) {
@@ -448,6 +441,28 @@ func formatToolArgs(args map[string]string) string {
 		parts = append(parts, fmt.Sprintf("%s=%s", k, args[k]))
 	}
 	return strings.Join(parts, ", ")
+}
+
+func plannedActionSummary(decision agent.DecisionResult) string {
+	switch strings.ToLower(strings.TrimSpace(decision.Action)) {
+	case "run_plugin":
+		s := "plugin " + strings.TrimSpace(decision.Plugin)
+		if len(decision.Args) > 0 {
+			s += " " + strings.Join(decision.Args, " ")
+		}
+		return s
+	case "run_tool":
+		s := "tool " + strings.TrimSpace(decision.Tool)
+		if args := formatToolArgs(decision.ToolArgs); strings.TrimSpace(args) != "" {
+			s += " (" + args + ")"
+		}
+		return s
+	default:
+		if strings.TrimSpace(decision.Answer) != "" {
+			return "answer"
+		}
+		return "noop"
+	}
 }
 
 var missingPathErr = regexp.MustCompile(`(?i)required path '([^']+)' does not exist`)

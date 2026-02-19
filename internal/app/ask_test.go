@@ -104,3 +104,28 @@ func TestAssessDecisionRisk(t *testing.T) {
 		t.Fatalf("expected high risk, got %q", risk)
 	}
 }
+
+func TestPlannedActionSummaryPlugin(t *testing.T) {
+	got := plannedActionSummary(agent.DecisionResult{
+		Action: "run_plugin",
+		Plugin: "g_status",
+		Args:   []string{"--short"},
+	})
+	if got != "plugin g_status --short" {
+		t.Fatalf("unexpected summary: %q", got)
+	}
+}
+
+func TestPlannedActionSummaryTool(t *testing.T) {
+	got := plannedActionSummary(agent.DecisionResult{
+		Action:   "run_tool",
+		Tool:     "search",
+		ToolArgs: map[string]string{"name": "report", "ext": "pdf"},
+	})
+	if !strings.HasPrefix(got, "tool search") {
+		t.Fatalf("unexpected summary: %q", got)
+	}
+	if !strings.Contains(got, "name=report") || !strings.Contains(got, "ext=pdf") {
+		t.Fatalf("expected tool args in summary, got %q", got)
+	}
+}
