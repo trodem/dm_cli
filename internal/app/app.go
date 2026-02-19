@@ -6,7 +6,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
 
 	"cli/internal/config"
 	"cli/internal/doctor"
@@ -32,7 +31,6 @@ func runLegacy(args []string) int {
 			BaseDir:    baseDir,
 			Version:    Version,
 			ExeBuiltAt: exeBuiltAt,
-			Now:        time.Now().Format("2006-01-02 15:04:05"),
 		})
 		return 0
 	}

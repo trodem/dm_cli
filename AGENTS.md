@@ -110,7 +110,7 @@ Repository guidelines for automated agents.
 
 ## Output
 - CLI output should remain human-friendly and minimal.
-- Splash should show `Version`, executable build time, and current time.
+- Splash should show `Version` and executable build time.
 
 ## Documentation
 - Update `README.md` when behavior, configuration, or structure changes.
