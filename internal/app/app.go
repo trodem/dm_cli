@@ -1,29 +1,25 @@
 package app
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 
-	"cli/internal/config"
 	"cli/internal/doctor"
 	"cli/internal/plugins"
-	"cli/internal/runner"
 	"cli/internal/ui"
 	"cli/tools"
 )
 
 func runLegacy(args []string) int {
-	opts, rest := parseFlags(args)
-	rt, err := loadRuntime(opts)
+	_, rest := parseFlags(args)
+	rt, err := loadRuntime(flags{})
 	if err != nil {
 		fmt.Println("Error:", err)
 		return 1
 	}
 	baseDir := rt.BaseDir
-	cfg := rt.Config
 
 	if len(rest) == 0 {
 		exeBuiltAt, _ := executableBuildTime()
@@ -40,11 +36,7 @@ func runLegacy(args []string) int {
 		return showPowerShellSymbols(resolveUserPowerShellProfilePath(), "$PROFILE")
 	}
 
-	// global commands
 	switch args[0] {
-	case "aliases", "config":
-		ui.PrintAliases(cfg)
-		return 0
 	case "ps_profile":
 		return showPowerShellSymbols(resolveUserPowerShellProfilePath(), "$PROFILE")
 	case "cp":
@@ -84,12 +76,6 @@ func runLegacy(args []string) int {
 			fmt.Println("Usage: dm open <ps_profile|profile>")
 			return 0
 		}
-	case "list":
-		return runList(cfg, args[1:])
-	case "add":
-		return runAdd(baseDir, args[1:])
-	case "validate":
-		return runValidate(baseDir, cfg)
 	case "doctor":
 		useJSON := false
 		for _, a := range args[1:] {
@@ -117,14 +103,6 @@ func runLegacy(args []string) int {
 			return tools.RunMenu(baseDir)
 		}
 		return tools.RunByName(baseDir, args[1])
-	case "run":
-		if len(args) < 2 {
-			fmt.Println("Usage: dm run <alias>")
-			return 0
-		}
-		name := args[1]
-		runner.RunAlias(cfg, name, "")
-		return 0
 	case "ask":
 		askOpts, confirmTools, riskPolicy, prompt, err := parseLegacyAskArgs(args[1:])
 		if err != nil {
@@ -135,53 +113,36 @@ func runLegacy(args []string) int {
 			return runAskInteractiveWithRisk(baseDir, askOpts, confirmTools, riskPolicy)
 		}
 		return runAskOnceWithSession(baseDir, prompt, askOpts, confirmTools, riskPolicy, nil)
+	case "toolkit":
+		if len(args) == 1 {
+			if err := runToolkitWizard(baseDir); err != nil {
+				fmt.Println("Error:", err)
+				return 1
+			}
+			return 0
+		}
+		fmt.Println("Usage: dm toolkit [new|add|validate]")
+		return 0
 	}
 
-	// PROJECT MODE: dm <project> <action>
-	return runTargetOrSearch(baseDir, cfg, args)
+	return runPluginOrSuggest(baseDir, args)
 }
 
-func runTargetOrSearch(baseDir string, cfg config.Config, args []string) int {
+func runPluginOrSuggest(baseDir string, args []string) int {
 	if len(args) == 0 {
 		return 0
 	}
-
-	// PROJECT MODE: dm <project> <action>
-	if _, ok := cfg.Projects[args[0]]; ok && len(args) >= 2 {
-		action := args[1]
-		runner.RunProjectCommand(cfg, args[0], action, baseDir)
-		return 0
-	}
-
-	// INTERACTIVE TARGET: dm <name>
-	name := args[0]
-
-	// target can be jump or project
-	targetPath, isJump := cfg.Jump[name]
-	_, isProject := cfg.Projects[name]
-
-	if !isJump && !isProject {
-		err := plugins.Run(baseDir, args[0], args[1:])
-		if err != nil {
-			if plugins.IsNotFound(err) {
-				fmt.Println("Error:", err)
-				if suggestion := suggestTopLevelName(baseDir, cfg, args[0]); suggestion != "" {
-					fmt.Printf("Did you mean: dm %s\n", suggestion)
-				}
-				return 1
-			}
+	if err := plugins.Run(baseDir, args[0], args[1:]); err != nil {
+		if plugins.IsNotFound(err) {
 			fmt.Println("Error:", err)
+			if suggestion := suggestTopLevelName(baseDir, args[0]); suggestion != "" {
+				fmt.Printf("Did you mean: dm %s\n", suggestion)
+			}
 			return 1
 		}
-		return 0
+		fmt.Println("Error:", err)
+		return 1
 	}
-
-	if isProject {
-		targetPath = cfg.Projects[name].Path
-	}
-
-	targetPath = config.ResolvePath(baseDir, targetPath)
-	ui.ShowMenu(cfg, name, targetPath, baseDir)
 	return 0
 }
 
@@ -214,36 +175,21 @@ func fileExists(path string) bool {
 
 type runtimeContext struct {
 	BaseDir string
-	Config  config.Config
 }
 
 func loadRuntime(opts flags) (runtimeContext, error) {
+	_ = opts
 	baseDir, err := exeDir()
 	if err != nil {
 		return runtimeContext{}, fmt.Errorf("cannot determine executable directory: %w", err)
 	}
-	cfgPath := filepath.Join(baseDir, "dm.json")
-	cfg, err := config.Load(cfgPath, config.Options{
-		Profile:  opts.Profile,
-		UseCache: !opts.NoCache,
-	})
-	if err != nil {
-		return runtimeContext{}, fmt.Errorf("loading config: %w", err)
-	}
-	return runtimeContext{
-		BaseDir: baseDir,
-		Config:  cfg,
-	}, nil
+	return runtimeContext{BaseDir: baseDir}, nil
 }
 
-type flags struct {
-	Profile string
-	NoCache bool
-}
+type flags struct{}
 
 func parseFlags(args []string) (flags, []string) {
-	var out []string
-	var f flags
+	out := make([]string, 0, len(args))
 	for i := 0; i < len(args); i++ {
 		arg := args[i]
 		if group, ok := mapGroupShortcut(arg); ok {
@@ -254,183 +200,9 @@ func parseFlags(args []string) (flags, []string) {
 			}
 			continue
 		}
-		if arg == "--no-cache" {
-			f.NoCache = true
-			continue
-		}
-		if arg == "--profile" && i+1 < len(args) {
-			f.Profile = args[i+1]
-			i++
-			continue
-		}
-		if strings.HasPrefix(arg, "--profile=") {
-			f.Profile = strings.TrimPrefix(arg, "--profile=")
-			continue
-		}
 		out = append(out, arg)
 	}
-	return f, out
-}
-
-func runValidate(baseDir string, cfg config.Config) int {
-	issues := config.Validate(cfg)
-	if len(issues) == 0 {
-		fmt.Println("OK: valid configuration")
-		return 0
-	}
-	for _, issue := range issues {
-		fmt.Printf("%s: %s\n", issue.Level, issue.Message)
-	}
-	return 1
-}
-
-func runList(cfg config.Config, args []string) int {
-	if len(args) == 0 {
-		fmt.Println("Usage: dm list <jumps|runs|projects|actions>")
-		return 0
-	}
-	switch args[0] {
-	case "jumps":
-		ui.PrintMap(cfg.Jump)
-	case "runs":
-		ui.PrintMap(cfg.Run)
-	case "projects":
-		ui.PrintProjects(cfg.Projects)
-	case "actions":
-		if len(args) < 2 {
-			fmt.Println("Usage: dm list actions <project>")
-			return 0
-		}
-		p, ok := cfg.Projects[args[1]]
-		if !ok {
-			fmt.Println("Project not found:", args[1])
-			return 0
-		}
-		ui.PrintMap(p.Commands)
-	default:
-		fmt.Println("Usage: dm list <jumps|runs|projects|actions>")
-	}
-	return 0
-}
-
-func runAdd(baseDir string, args []string) int {
-	if len(args) < 1 {
-		fmt.Println("Usage: dm add <jump|run|project|action> ...")
-		return 0
-	}
-	switch args[0] {
-	case "jump":
-		if len(args) < 3 {
-			fmt.Println("Usage: dm add jump <name> <path>")
-			return 0
-		}
-		err := updateRootConfig(baseDir, func(cfg *config.Config) {
-			cfg.Jump[args[1]] = args[2]
-		})
-		if err != nil {
-			fmt.Println("Error:", err)
-			return 1
-		}
-		fmt.Println("OK: jump added")
-		return 0
-	case "run":
-		if len(args) < 3 {
-			fmt.Println("Usage: dm add run <name> <command>")
-			return 0
-		}
-		err := updateRootConfig(baseDir, func(cfg *config.Config) {
-			cfg.Run[args[1]] = strings.Join(args[2:], " ")
-		})
-		if err != nil {
-			fmt.Println("Error:", err)
-			return 1
-		}
-		fmt.Println("OK: run added")
-		return 0
-	case "project":
-		if len(args) < 3 {
-			fmt.Println("Usage: dm add project <name> <path>")
-			return 0
-		}
-		err := updateRootConfig(baseDir, func(cfg *config.Config) {
-			cfg.Projects[args[1]] = config.Project{
-				Path:     args[2],
-				Commands: map[string]string{},
-			}
-		})
-		if err != nil {
-			fmt.Println("Error:", err)
-			return 1
-		}
-		fmt.Println("OK: project added")
-		return 0
-	case "action":
-		if len(args) < 4 {
-			fmt.Println("Usage: dm add action <project> <name> <command>")
-			return 0
-		}
-		project := args[1]
-		action := args[2]
-		cmd := strings.Join(args[3:], " ")
-		cfg, err := config.Load(filepath.Join(baseDir, "dm.json"), config.Options{UseCache: false})
-		if err != nil {
-			fmt.Println("Error:", err)
-			return 1
-		}
-		p, ok := cfg.Projects[project]
-		if !ok {
-			fmt.Println("Project not found. Add the project first.")
-			return 1
-		}
-		if p.Commands == nil {
-			p.Commands = map[string]string{}
-		}
-		p.Commands[action] = cmd
-		err = updateRootConfig(baseDir, func(cfg *config.Config) {
-			cfg.Projects[project] = p
-		})
-		if err != nil {
-			fmt.Println("Error:", err)
-			return 1
-		}
-		fmt.Println("OK: action added")
-		return 0
-	default:
-		fmt.Println("Usage: dm add <jump|run|project|action> ...")
-		return 0
-	}
-}
-
-func updateRootConfig(baseDir string, mutate func(cfg *config.Config)) error {
-	path := filepath.Join(baseDir, "dm.json")
-	cfg := config.Config{}
-	if fileExists(path) {
-		data, err := os.ReadFile(path)
-		if err != nil {
-			return err
-		}
-		if len(strings.TrimSpace(string(data))) > 0 {
-			if err := json.Unmarshal(data, &cfg); err != nil {
-				return err
-			}
-		}
-	}
-	if cfg.Jump == nil {
-		cfg.Jump = map[string]string{}
-	}
-	if cfg.Run == nil {
-		cfg.Run = map[string]string{}
-	}
-	if cfg.Projects == nil {
-		cfg.Projects = map[string]config.Project{}
-	}
-	mutate(&cfg)
-	out, err := json.MarshalIndent(cfg, "", "  ")
-	if err != nil {
-		return err
-	}
-	out = append(out, '\n')
-	return os.WriteFile(path, out, 0644)
+	return flags{}, out
 }
 
 func runPlugin(baseDir string, args []string) int {
@@ -527,15 +299,9 @@ func runPlugin(baseDir string, args []string) int {
 	}
 }
 
-func suggestTopLevelName(baseDir string, cfg config.Config, input string) string {
+func suggestTopLevelName(baseDir string, input string) string {
 	candidates := []string{
-		"aliases", "config", "ps_profile", "cp", "open", "list", "add", "validate", "doctor", "plugins", "tools", "toolkit", "run",
-	}
-	for k := range cfg.Jump {
-		candidates = append(candidates, k)
-	}
-	for k := range cfg.Projects {
-		candidates = append(candidates, k)
+		"ps_profile", "cp", "open", "doctor", "plugins", "tools", "toolkit", "ask", "completion", "help",
 	}
 	if items, err := plugins.ListEntries(baseDir, true); err == nil {
 		for _, it := range items {

@@ -33,11 +33,11 @@ Useful commands
 General:
   dm help
   dm doctor
-  dm validate
   dm ps_profile
   dm cp profile
   dm -o ps_profile
   dm -o profile
+  dm completion install
 
 Tools:
   dm tools
@@ -74,6 +74,5 @@ Scripts
 Notes
 -----
 - Splash shows Version and executable build time.
-- dm.json is optional (custom includes/profiles).
 - Set NO_COLOR=1 to disable ANSI colors.
 - Default install dir is %LOCALAPPDATA%\Programs\dm-cli.

@@ -21,8 +21,8 @@ func Run(args []string) int {
 
 	root := &cobra.Command{
 		Use:   "dm",
-		Short: "Personal CLI for jumps, project actions, and knowledge search",
-		Long:  "dm is a personal CLI to jump to folders, run aliases/actions, and search knowledge notes.",
+		Short: "Personal CLI for tools, plugins, and AI helpers",
+		Long:  "dm is a personal CLI for tools, plugins, and AI-driven workflows.",
 		Example: "dm help\n" +
 			"dm help plugins\n" +
 			"dm help <function_name>",
@@ -37,8 +37,6 @@ func Run(args []string) int {
 		},
 	}
 
-	root.PersistentFlags().BoolVar(&opts.NoCache, "no-cache", false, "disable config cache")
-	root.PersistentFlags().StringVar(&opts.Profile, "profile", "", "use profile")
 	root.PersistentFlags().BoolP("tools", "t", false, "shortcut for 'tools' command")
 	root.PersistentFlags().BoolP("plugins", "p", false, "shortcut for 'plugins' command")
 	root.PersistentFlags().BoolP("open", "o", false, "shortcut for 'open' command")
@@ -81,7 +79,7 @@ func Run(args []string) int {
 			if len(rest) > 1 && rest[0] == "plugins" && (rest[1] == "$profile" || strings.EqualFold(rest[1], "profile")) {
 				return runPlugin(rt.BaseDir, []string{"$profile"})
 			}
-			return runTargetOrSearch(rt.BaseDir, rt.Config, rest)
+			return runPluginOrSuggest(rt.BaseDir, rest)
 		}
 		if msg != "" {
 			fmt.Println("Error:", msg)
@@ -92,15 +90,8 @@ func Run(args []string) int {
 }
 
 func legacyArgsWithFlags(opts flags, positional []string) []string {
-	legacyArgs := make([]string, 0, len(positional)+6)
-	if opts.NoCache {
-		legacyArgs = append(legacyArgs, "--no-cache")
-	}
-	if opts.Profile != "" {
-		legacyArgs = append(legacyArgs, "--profile", opts.Profile)
-	}
-	legacyArgs = append(legacyArgs, positional...)
-	return legacyArgs
+	_ = opts
+	return append([]string{}, positional...)
 }
 
 func addPluginAwareHelpCommand(root *cobra.Command, opts *flags) {

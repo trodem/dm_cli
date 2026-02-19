@@ -3,8 +3,6 @@ package app
 import (
 	"reflect"
 	"testing"
-
-	"cli/internal/config"
 )
 
 func TestParseFlagsToolsShortcut(t *testing.T) {
@@ -24,11 +22,8 @@ func TestParseFlagsToolsShortcutWithTarget(t *testing.T) {
 }
 
 func TestParseFlagsToolsShortcutWithUnrelatedFlags(t *testing.T) {
-	f, out := parseFlags([]string{"--profile", "work", "-t", "s"})
-	want := []string{"tools", "s"}
-	if f.Profile != "work" {
-		t.Fatalf("expected profile work, got %q", f.Profile)
-	}
+	_, out := parseFlags([]string{"--verbose", "-t", "s"})
+	want := []string{"--verbose", "tools", "s"}
 	if !reflect.DeepEqual(out, want) {
 		t.Fatalf("expected %v, got %v", want, out)
 	}
@@ -50,15 +45,9 @@ func TestParseFlagsOpenShortcut(t *testing.T) {
 	}
 }
 
-func TestRunTargetOrSearchUnknownReturnsError(t *testing.T) {
+func TestRunPluginOrSuggestUnknownReturnsError(t *testing.T) {
 	baseDir := t.TempDir()
-	cfg := config.Config{
-		Jump:     map[string]string{},
-		Run:      map[string]string{},
-		Projects: map[string]config.Project{},
-	}
-
-	code := runTargetOrSearch(baseDir, cfg, []string{"not-existing-command"})
+	code := runPluginOrSuggest(baseDir, []string{"not-existing-command"})
 	if code != 1 {
 		t.Fatalf("expected exit code 1, got %d", code)
 	}

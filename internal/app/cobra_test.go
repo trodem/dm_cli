@@ -27,8 +27,8 @@ func TestRewriteGroupShortcutsToolsWithTarget(t *testing.T) {
 }
 
 func TestRewriteGroupShortcutsMixedArgs(t *testing.T) {
-	got := rewriteGroupShortcuts([]string{"--profile", "work", "-t", "search"})
-	want := []string{"--profile", "work", "tools", "search"}
+	got := rewriteGroupShortcuts([]string{"--verbose", "-t", "search"})
+	want := []string{"--verbose", "tools", "search"}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("expected %v, got %v", want, got)
 	}

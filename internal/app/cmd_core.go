@@ -7,42 +7,12 @@ import (
 	"cli/internal/agent"
 	"cli/internal/doctor"
 	"cli/internal/plugins"
-	"cli/internal/runner"
-	"cli/internal/ui"
 	"cli/tools"
 
 	"github.com/spf13/cobra"
 )
 
 func addCobraSubcommands(root *cobra.Command, opts *flags) {
-	root.AddCommand(&cobra.Command{
-		Use:     "aliases",
-		Aliases: []string{"a"},
-		Short:   "Show aliases and projects",
-		Args:    cobra.NoArgs,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			rt, err := loadRuntime(*opts)
-			if err != nil {
-				return err
-			}
-			ui.PrintAliases(rt.Config)
-			return nil
-		},
-	})
-	root.AddCommand(&cobra.Command{
-		Use:     "config",
-		Aliases: []string{"cfg"},
-		Short:   "Show aliases and projects",
-		Args:    cobra.NoArgs,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			rt, err := loadRuntime(*opts)
-			if err != nil {
-				return err
-			}
-			ui.PrintAliases(rt.Config)
-			return nil
-		},
-	})
 	root.AddCommand(&cobra.Command{
 		Use:   "ps_profile",
 		Short: "Show functions and aliases from PowerShell $PROFILE",
@@ -119,70 +89,9 @@ func addCobraSubcommands(root *cobra.Command, opts *flags) {
 		},
 	})
 	root.AddCommand(openCmd)
-	root.AddCommand(&cobra.Command{
-		Use:   "list",
-		Short: "List config entries",
-		Args:  cobra.ArbitraryArgs,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			rt, err := loadRuntime(*opts)
-			if err != nil {
-				return err
-			}
-			code := runList(rt.Config, args)
-			if code != 0 {
-				return exitCodeError{code: code}
-			}
-			return nil
-		},
-	})
-	root.AddCommand(&cobra.Command{
-		Use:   "add",
-		Short: "Add config entries",
-		Args:  cobra.ArbitraryArgs,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			rt, err := loadRuntime(*opts)
-			if err != nil {
-				return err
-			}
-			code := runAdd(rt.BaseDir, args)
-			if code != 0 {
-				return exitCodeError{code: code}
-			}
-			return nil
-		},
-	})
 	root.AddCommand(newPluginCommand(opts))
 	root.AddCommand(newToolsCommand(opts))
 	root.AddCommand(newToolkitCommand(opts))
-	root.AddCommand(&cobra.Command{
-		Use:   "run <alias>",
-		Short: "Run alias from config",
-		Args:  cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			rt, err := loadRuntime(*opts)
-			if err != nil {
-				return err
-			}
-			runner.RunAlias(rt.Config, args[0], "")
-			return nil
-		},
-	})
-	root.AddCommand(&cobra.Command{
-		Use:   "validate",
-		Short: "Validate configuration",
-		Args:  cobra.NoArgs,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			rt, err := loadRuntime(*opts)
-			if err != nil {
-				return err
-			}
-			code := runValidate(rt.BaseDir, rt.Config)
-			if code != 0 {
-				return exitCodeError{code: code}
-			}
-			return nil
-		},
-	})
 	var doctorJSON bool
 	doctorCmd := &cobra.Command{
 		Use:   "doctor",
@@ -217,9 +126,9 @@ func addCobraSubcommands(root *cobra.Command, opts *flags) {
 	var askRiskPolicy string
 	askCmd := &cobra.Command{
 		Use:   "ask <prompt...>",
-		Short: "Ask AI (Ollama first, OpenAI fallback)",
-		Long: "Tries local Ollama with model deepseek-coder-v2:latest first. " +
-			"If unavailable, falls back to OpenAI using user config in ~/.config/dm/agent.json.",
+		Short: "Ask AI (openai|ollama|auto)",
+		Long: "Uses provider selected by --provider (default: openai). " +
+			"With --provider auto, dm tries Ollama first and falls back to OpenAI.",
 		Args: cobra.ArbitraryArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			askOpts := agent.AskOptions{
