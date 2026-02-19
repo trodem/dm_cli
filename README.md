@@ -356,7 +356,7 @@ PowerShell profile function bridge:
 - `dm <function_name>` can invoke functions declared in PowerShell source files under `plugins/` (recursive: `.ps1`, `.psm1`, `.txt`).
 - `dm help <function_name>` shows detailed info when the function is discovered as plugin bridge entry.
 - CI runs `PSScriptAnalyzer` in non-blocking mode and validates help blocks for all discovered functions.
-- Git function quick reference: `docs/git-cheatsheet.md` (generated from `plugins/functions/git.ps1`).
+- Git function quick reference: `docs/git-cheatsheet.md`.
 
 Toolkit generator (built into `dm`, no second exe required):
 ```powershell

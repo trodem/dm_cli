@@ -81,8 +81,6 @@ Repository guidelines for automated agents.
   - require explicit switch/confirmation for high-risk operations
   - do not add wrappers for destructive Git commands like `reset --hard` unless explicitly requested
 - Use guard helpers (for example command/path checks) before calling external tools.
-- Regenerate docs when Git plugin functions change:
-  - `go run ./scripts/gen_git_cheatsheet`
 - Validate plugin help blocks before finalizing changes:
   - `go run ./scripts/check_plugin_help.go`
 
