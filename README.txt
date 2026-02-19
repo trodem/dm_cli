@@ -25,26 +25,49 @@ From this folder:
 
 Useful commands
 ---------------
-General help:
+General:
   dm help
+  dm doctor
+  dm validate
   dm ps_profile
   dm cp profile
   dm -o ps_profile
   dm -o profile
 
-Tools menu:
+Tools:
   dm tools
   dm tools system
-
-Run aliases and project actions:
-  dm run <alias>
-  dm <project> <action>
+  dm -t search
 
 Plugins:
+  dm -p
   dm plugins list
+  dm plugins list --functions
+  dm plugins menu
   dm plugins run <name>
+
+Toolkit generator (built-in):
+  dm toolkit
+  dm toolkit new --name MSWord --prefix word --category office
+  dm toolkit add --file plugins/functions/office/MSWord_Toolkit.ps1 --prefix word --func export_pdf --param InputPath --param OutputPath --confirm
+  dm toolkit validate
+
+Agent:
+  dm ask
+  dm ask "spiegami questo errore"
+
+Build with explicit version (instead of default dev)
+----------------------------------------------------
+  go build -ldflags "-X cli/internal/app.Version=v0.2.0" -o dm.exe .
+
+Scripts
+-------
+- scripts/release.ps1: build + package release artifacts
+- scripts/check_plugin_help.go: validate plugin help blocks
+- scripts/smoke_plugins.ps1: plugin smoke checks
 
 Notes
 -----
-- dm.json is optional (custom includes/profiles)
-- Set NO_COLOR=1 to disable ANSI colors
+- Splash shows Version and executable build time.
+- dm.json is optional (custom includes/profiles).
+- Set NO_COLOR=1 to disable ANSI colors.
