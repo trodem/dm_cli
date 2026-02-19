@@ -2,6 +2,7 @@ package app
 
 import (
 	"bufio"
+	"encoding/json"
 	"fmt"
 	"os"
 	"regexp"
@@ -76,33 +77,79 @@ func parseLegacyAskArgs(args []string) (agent.AskOptions, bool, string, string, 
 }
 
 func runAskOnce(baseDir, prompt string, opts agent.AskOptions, confirmTools bool) int {
-	return runAskOnceWithSession(baseDir, prompt, opts, confirmTools, riskPolicyNormal, nil)
+	return runAskOnceWithSession(baseDir, prompt, opts, confirmTools, riskPolicyNormal, nil, false)
 }
 
-func runAskOnceWithSession(baseDir, prompt string, opts agent.AskOptions, confirmTools bool, riskPolicy string, previousPrompts []string) int {
+type askJSONStep struct {
+	Step       int    `json:"step"`
+	Action     string `json:"action"`
+	Target     string `json:"target,omitempty"`
+	Args       string `json:"args,omitempty"`
+	Reason     string `json:"reason,omitempty"`
+	Risk       string `json:"risk,omitempty"`
+	RiskReason string `json:"risk_reason,omitempty"`
+	Status     string `json:"status"`
+}
+
+type askJSONOutput struct {
+	Provider string        `json:"provider,omitempty"`
+	Model    string        `json:"model,omitempty"`
+	Action   string        `json:"action"`
+	Answer   string        `json:"answer,omitempty"`
+	Steps    []askJSONStep `json:"steps,omitempty"`
+	Error    string        `json:"error,omitempty"`
+}
+
+func runAskOnceWithSession(baseDir, prompt string, opts agent.AskOptions, confirmTools bool, riskPolicy string, previousPrompts []string, jsonOut bool) int {
 	catalog := buildPluginCatalog(baseDir)
 	toolsCatalog := buildToolsCatalog()
 	history := []askActionRecord{}
+	jsonResult := askJSONOutput{Action: "answer", Steps: []askJSONStep{}}
 	lastSignature := ""
 	for step := 1; step <= askMaxSteps; step++ {
 		decisionPrompt := buildAskPlannerPrompt(prompt, history, previousPrompts)
 		decision, err := agent.DecideWithPlugins(decisionPrompt, catalog, toolsCatalog, opts)
 		if err != nil {
-			fmt.Println("Error:", err)
+			if jsonOut {
+				jsonResult.Action = "error"
+				jsonResult.Error = err.Error()
+				emitAskJSON(jsonResult)
+			} else {
+				fmt.Println("Error:", err)
+			}
 			return 1
 		}
-		fmt.Printf("[%s | %s]\n", decision.Provider, decision.Model)
+		jsonResult.Provider = decision.Provider
+		jsonResult.Model = decision.Model
+		if !jsonOut {
+			fmt.Printf("[%s | %s]\n", decision.Provider, decision.Model)
+		}
 
 		if decision.Action == "answer" || strings.TrimSpace(decision.Action) == "" {
-			fmt.Println(decision.Answer)
+			jsonResult.Action = "answer"
+			jsonResult.Answer = decision.Answer
+			if jsonOut {
+				emitAskJSON(jsonResult)
+			} else {
+				fmt.Println(decision.Answer)
+			}
 			return 0
 		}
 
 		sig := decisionSignature(decision)
 		if sig != "" && sig == lastSignature {
-			fmt.Println(ui.Warn("Agent repeated the same action; stopping to avoid loop."))
-			if strings.TrimSpace(decision.Answer) != "" {
-				fmt.Println(decision.Answer)
+			if jsonOut {
+				jsonResult.Action = "answer"
+				jsonResult.Answer = strings.TrimSpace(decision.Answer)
+				if jsonResult.Answer == "" {
+					jsonResult.Answer = "Agent repeated the same action; stopped to avoid loop."
+				}
+				emitAskJSON(jsonResult)
+			} else {
+				fmt.Println(ui.Warn("Agent repeated the same action; stopping to avoid loop."))
+				if strings.TrimSpace(decision.Answer) != "" {
+					fmt.Println(decision.Answer)
+				}
 			}
 			return 0
 		}
@@ -110,36 +157,80 @@ func runAskOnceWithSession(baseDir, prompt string, opts agent.AskOptions, confir
 
 		if decision.Action == "run_plugin" {
 			if strings.TrimSpace(decision.Plugin) == "" {
-				fmt.Println("Error: agent selected run_plugin without plugin name")
-				return 1
-			}
-			if _, err := plugins.GetInfo(baseDir, decision.Plugin); err != nil {
-				fmt.Println("Error: agent selected unknown plugin:", decision.Plugin)
-				if strings.TrimSpace(decision.Answer) != "" {
-					fmt.Println(decision.Answer)
+				if jsonOut {
+					jsonResult.Action = "error"
+					jsonResult.Error = "agent selected run_plugin without plugin name"
+					emitAskJSON(jsonResult)
+				} else {
+					fmt.Println("Error: agent selected run_plugin without plugin name")
 				}
 				return 1
 			}
-			if strings.TrimSpace(decision.Reason) != "" {
-				fmt.Println("Reason:", decision.Reason)
+			if _, err := plugins.GetInfo(baseDir, decision.Plugin); err != nil {
+				if jsonOut {
+					jsonResult.Action = "error"
+					jsonResult.Error = "agent selected unknown plugin: " + decision.Plugin
+					jsonResult.Answer = strings.TrimSpace(decision.Answer)
+					emitAskJSON(jsonResult)
+				} else {
+					fmt.Println("Error: agent selected unknown plugin:", decision.Plugin)
+					if strings.TrimSpace(decision.Answer) != "" {
+						fmt.Println(decision.Answer)
+					}
+				}
+				return 1
 			}
-			fmt.Printf("%s %d/%d: %s\n", ui.Accent("Plan step"), step, askMaxSteps, plannedActionSummary(decision))
 			risk, riskReason := assessDecisionRisk(decision)
-			fmt.Printf("%s %s (%s)\n", ui.Warn("Risk:"), strings.ToUpper(risk), riskReason)
+			if !jsonOut {
+				if strings.TrimSpace(decision.Reason) != "" {
+					fmt.Println("Reason:", decision.Reason)
+				}
+				fmt.Printf("%s %d/%d: %s\n", ui.Accent("Plan step"), step, askMaxSteps, plannedActionSummary(decision))
+				fmt.Printf("%s %s (%s)\n", ui.Warn("Risk:"), strings.ToUpper(risk), riskReason)
+			}
+			stepRecord := askJSONStep{
+				Step:       step,
+				Action:     "run_plugin",
+				Target:     decision.Plugin,
+				Args:       strings.Join(decision.Args, " "),
+				Reason:     strings.TrimSpace(decision.Reason),
+				Risk:       risk,
+				RiskReason: riskReason,
+				Status:     "pending",
+			}
 			if shouldConfirmAction(confirmTools, riskPolicy, risk) {
 				reader := bufio.NewReader(os.Stdin)
 				if !confirmAgentAction(reader, risk) {
-					fmt.Println(ui.Warn("Canceled."))
-					if strings.TrimSpace(decision.Answer) != "" {
-						fmt.Println(decision.Answer)
+					stepRecord.Status = "canceled"
+					jsonResult.Steps = append(jsonResult.Steps, stepRecord)
+					if jsonOut {
+						jsonResult.Action = "answer"
+						jsonResult.Answer = strings.TrimSpace(decision.Answer)
+						emitAskJSON(jsonResult)
+					} else {
+						fmt.Println(ui.Warn("Canceled."))
+						if strings.TrimSpace(decision.Answer) != "" {
+							fmt.Println(decision.Answer)
+						}
 					}
 					return 0
 				}
 			}
 			if err := plugins.Run(baseDir, decision.Plugin, decision.Args); err != nil {
-				printAgentActionError(err)
+				stepRecord.Status = "error"
+				jsonResult.Steps = append(jsonResult.Steps, stepRecord)
+				if jsonOut {
+					jsonResult.Action = "error"
+					jsonResult.Error = err.Error()
+					jsonResult.Answer = strings.TrimSpace(decision.Answer)
+					emitAskJSON(jsonResult)
+				} else {
+					printAgentActionError(err)
+				}
 				return 1
 			}
+			stepRecord.Status = "ok"
+			jsonResult.Steps = append(jsonResult.Steps, stepRecord)
 			history = append(history, askActionRecord{
 				Step:   step,
 				Action: "run_plugin",
@@ -148,10 +239,22 @@ func runAskOnceWithSession(baseDir, prompt string, opts agent.AskOptions, confir
 				Result: "ok",
 			})
 			if strings.TrimSpace(decision.Answer) != "" {
-				fmt.Println(decision.Answer)
+				if jsonOut {
+					jsonResult.Answer = decision.Answer
+				} else {
+					fmt.Println(decision.Answer)
+				}
 			}
 			if step == askMaxSteps {
-				fmt.Println(ui.Warn("Reached max agent steps; stopping."))
+				if jsonOut {
+					jsonResult.Action = "answer"
+					if strings.TrimSpace(jsonResult.Answer) == "" {
+						jsonResult.Answer = "Reached max agent steps; stopping."
+					}
+					emitAskJSON(jsonResult)
+				} else {
+					fmt.Println(ui.Warn("Reached max agent steps; stopping."))
+				}
 				return 0
 			}
 			continue
@@ -160,34 +263,75 @@ func runAskOnceWithSession(baseDir, prompt string, opts agent.AskOptions, confir
 		if decision.Action == "run_tool" {
 			toolName := strings.TrimSpace(decision.Tool)
 			if toolName == "" {
-				fmt.Println("Error: agent selected run_tool without tool name")
-				return 1
-			}
-			if !isKnownTool(toolName) {
-				fmt.Println("Error: agent selected unknown tool:", toolName)
-				if strings.TrimSpace(decision.Answer) != "" {
-					fmt.Println(decision.Answer)
+				if jsonOut {
+					jsonResult.Action = "error"
+					jsonResult.Error = "agent selected run_tool without tool name"
+					emitAskJSON(jsonResult)
+				} else {
+					fmt.Println("Error: agent selected run_tool without tool name")
 				}
 				return 1
 			}
-			if strings.TrimSpace(decision.Reason) != "" {
-				fmt.Println("Reason:", decision.Reason)
+			if !isKnownTool(toolName) {
+				if jsonOut {
+					jsonResult.Action = "error"
+					jsonResult.Error = "agent selected unknown tool: " + toolName
+					jsonResult.Answer = strings.TrimSpace(decision.Answer)
+					emitAskJSON(jsonResult)
+				} else {
+					fmt.Println("Error: agent selected unknown tool:", toolName)
+					if strings.TrimSpace(decision.Answer) != "" {
+						fmt.Println(decision.Answer)
+					}
+				}
+				return 1
 			}
-			fmt.Printf("%s %d/%d: %s\n", ui.Accent("Plan step"), step, askMaxSteps, plannedActionSummary(decision))
 			risk, riskReason := assessDecisionRisk(decision)
-			fmt.Printf("%s %s (%s)\n", ui.Warn("Risk:"), strings.ToUpper(risk), riskReason)
+			if !jsonOut {
+				if strings.TrimSpace(decision.Reason) != "" {
+					fmt.Println("Reason:", decision.Reason)
+				}
+				fmt.Printf("%s %d/%d: %s\n", ui.Accent("Plan step"), step, askMaxSteps, plannedActionSummary(decision))
+				fmt.Printf("%s %s (%s)\n", ui.Warn("Risk:"), strings.ToUpper(risk), riskReason)
+			}
+			stepRecord := askJSONStep{
+				Step:       step,
+				Action:     "run_tool",
+				Target:     toolName,
+				Args:       formatToolArgs(decision.ToolArgs),
+				Reason:     strings.TrimSpace(decision.Reason),
+				Risk:       risk,
+				RiskReason: riskReason,
+				Status:     "pending",
+			}
 			if shouldConfirmAction(confirmTools, riskPolicy, risk) {
 				reader := bufio.NewReader(os.Stdin)
 				if !confirmAgentAction(reader, risk) {
-					fmt.Println(ui.Warn("Canceled."))
-					if strings.TrimSpace(decision.Answer) != "" {
-						fmt.Println(decision.Answer)
+					stepRecord.Status = "canceled"
+					jsonResult.Steps = append(jsonResult.Steps, stepRecord)
+					if jsonOut {
+						jsonResult.Action = "answer"
+						jsonResult.Answer = strings.TrimSpace(decision.Answer)
+						emitAskJSON(jsonResult)
+					} else {
+						fmt.Println(ui.Warn("Canceled."))
+						if strings.TrimSpace(decision.Answer) != "" {
+							fmt.Println(decision.Answer)
+						}
 					}
 					return 0
 				}
 			}
 			run := tools.RunByNameWithParamsDetailed(baseDir, toolName, decision.ToolArgs)
 			if run.Code != 0 {
+				stepRecord.Status = "error"
+				jsonResult.Steps = append(jsonResult.Steps, stepRecord)
+				if jsonOut {
+					jsonResult.Action = "error"
+					jsonResult.Error = fmt.Sprintf("tool execution failed: %s", toolName)
+					jsonResult.Answer = strings.TrimSpace(decision.Answer)
+					emitAskJSON(jsonResult)
+				}
 				return run.Code
 			}
 			reader := bufio.NewReader(os.Stdin)
@@ -203,9 +347,19 @@ func runAskOnceWithSession(baseDir, prompt string, opts agent.AskOptions, confir
 				}
 				run = tools.RunByNameWithParamsDetailed(baseDir, toolName, run.ContinueParams)
 				if run.Code != 0 {
+					stepRecord.Status = "error"
+					jsonResult.Steps = append(jsonResult.Steps, stepRecord)
+					if jsonOut {
+						jsonResult.Action = "error"
+						jsonResult.Error = fmt.Sprintf("tool continuation failed: %s", toolName)
+						jsonResult.Answer = strings.TrimSpace(decision.Answer)
+						emitAskJSON(jsonResult)
+					}
 					return run.Code
 				}
 			}
+			stepRecord.Status = "ok"
+			jsonResult.Steps = append(jsonResult.Steps, stepRecord)
 			history = append(history, askActionRecord{
 				Step:   step,
 				Action: "run_tool",
@@ -214,16 +368,34 @@ func runAskOnceWithSession(baseDir, prompt string, opts agent.AskOptions, confir
 				Result: "ok",
 			})
 			if strings.TrimSpace(decision.Answer) != "" {
-				fmt.Println(decision.Answer)
+				if jsonOut {
+					jsonResult.Answer = decision.Answer
+				} else {
+					fmt.Println(decision.Answer)
+				}
 			}
 			if step == askMaxSteps {
-				fmt.Println(ui.Warn("Reached max agent steps; stopping."))
+				if jsonOut {
+					jsonResult.Action = "answer"
+					if strings.TrimSpace(jsonResult.Answer) == "" {
+						jsonResult.Answer = "Reached max agent steps; stopping."
+					}
+					emitAskJSON(jsonResult)
+				} else {
+					fmt.Println(ui.Warn("Reached max agent steps; stopping."))
+				}
 				return 0
 			}
 			continue
 		}
 
-		fmt.Println(decision.Answer)
+		jsonResult.Action = "answer"
+		jsonResult.Answer = decision.Answer
+		if jsonOut {
+			emitAskJSON(jsonResult)
+		} else {
+			fmt.Println(decision.Answer)
+		}
 		return 0
 	}
 	return 0
@@ -309,7 +481,7 @@ func runAskInteractiveWithRisk(baseDir string, opts agent.AskOptions, confirmToo
 		case "/exit", "exit", "quit":
 			return 0
 		}
-		_ = runAskOnceWithSession(baseDir, prompt, sessionOpts, confirmTools, riskPolicy, previousPrompts)
+		_ = runAskOnceWithSession(baseDir, prompt, sessionOpts, confirmTools, riskPolicy, previousPrompts, false)
 		previousPrompts = append(previousPrompts, prompt)
 		if len(previousPrompts) > 6 {
 			previousPrompts = previousPrompts[len(previousPrompts)-6:]
@@ -463,6 +635,12 @@ func plannedActionSummary(decision agent.DecisionResult) string {
 		}
 		return "noop"
 	}
+}
+
+func emitAskJSON(v askJSONOutput) {
+	enc := json.NewEncoder(os.Stdout)
+	enc.SetIndent("", "  ")
+	_ = enc.Encode(v)
 }
 
 var missingPathErr = regexp.MustCompile(`(?i)required path '([^']+)' does not exist`)

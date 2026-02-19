@@ -72,11 +72,13 @@ Flags:
 - `--base-url <url>`
 - `--confirm-tools` / `--no-confirm-tools`
 - `--risk-policy strict|normal|off`
+- `--json` (structured output, one-shot mode only)
 
 Examples:
 ```bash
 dm ask "spiegami questo errore"
 dm ask --provider auto "cerca i file pdf in Downloads"
+dm ask --json "trova file recenti in Downloads"
 ```
 
 Config path priority:

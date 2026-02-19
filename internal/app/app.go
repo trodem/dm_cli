@@ -112,7 +112,7 @@ func runLegacy(args []string) int {
 		if strings.TrimSpace(prompt) == "" {
 			return runAskInteractiveWithRisk(baseDir, askOpts, confirmTools, riskPolicy)
 		}
-		return runAskOnceWithSession(baseDir, prompt, askOpts, confirmTools, riskPolicy, nil)
+		return runAskOnceWithSession(baseDir, prompt, askOpts, confirmTools, riskPolicy, nil, false)
 	case "toolkit":
 		if len(args) == 1 {
 			if err := runToolkitWizard(baseDir); err != nil {

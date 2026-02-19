@@ -124,6 +124,7 @@ func addCobraSubcommands(root *cobra.Command, opts *flags) {
 	var askConfirmTools bool
 	var askNoConfirmTools bool
 	var askRiskPolicy string
+	var askJSON bool
 	askCmd := &cobra.Command{
 		Use:   "ask <prompt...>",
 		Short: "Ask AI (openai|ollama|auto)",
@@ -149,13 +150,16 @@ func addCobraSubcommands(root *cobra.Command, opts *flags) {
 				return err
 			}
 			if len(args) == 0 {
+				if askJSON {
+					return fmt.Errorf("--json requires a prompt (non-interactive mode)")
+				}
 				code := runAskInteractiveWithRisk(rt.BaseDir, askOpts, confirmTools, riskPolicy)
 				if code != 0 {
 					return exitCodeError{code: code}
 				}
 				return nil
 			}
-			code := runAskOnceWithSession(rt.BaseDir, strings.Join(args, " "), askOpts, confirmTools, riskPolicy, nil)
+			code := runAskOnceWithSession(rt.BaseDir, strings.Join(args, " "), askOpts, confirmTools, riskPolicy, nil, askJSON)
 			if code != 0 {
 				return exitCodeError{code: code}
 			}
@@ -168,6 +172,7 @@ func addCobraSubcommands(root *cobra.Command, opts *flags) {
 	askCmd.Flags().BoolVar(&askConfirmTools, "confirm-tools", true, "ask confirmation before agent runs a plugin/function/tool")
 	askCmd.Flags().BoolVar(&askNoConfirmTools, "no-confirm-tools", false, "disable confirmation before agent actions")
 	askCmd.Flags().StringVar(&askRiskPolicy, "risk-policy", riskPolicyNormal, "risk policy: strict|normal|off")
+	askCmd.Flags().BoolVar(&askJSON, "json", false, "print structured JSON output (non-interactive only)")
 	root.AddCommand(askCmd)
 }
 
