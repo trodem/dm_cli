@@ -2,12 +2,16 @@ package app
 
 import (
 	"bufio"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"os"
 	"regexp"
 	"sort"
 	"strings"
+	"sync"
+	"time"
 
 	"cli/internal/agent"
 	"cli/internal/plugins"
@@ -16,11 +20,58 @@ import (
 )
 
 const askMaxSteps = 4
+const askDecisionCacheTTL = 3 * time.Minute
+
 const (
 	riskPolicyStrict = "strict"
 	riskPolicyNormal = "normal"
 	riskPolicyOff    = "off"
 )
+
+type decisionCacheEntry struct {
+	at    time.Time
+	value agent.DecisionResult
+}
+
+type decisionCacheStore struct {
+	mu    sync.RWMutex
+	ttl   time.Duration
+	items map[string]decisionCacheEntry
+}
+
+func newDecisionCacheStore(ttl time.Duration) *decisionCacheStore {
+	return &decisionCacheStore{
+		ttl:   ttl,
+		items: map[string]decisionCacheEntry{},
+	}
+}
+
+func (c *decisionCacheStore) Get(key string, now time.Time) (agent.DecisionResult, bool) {
+	c.mu.RLock()
+	entry, ok := c.items[key]
+	c.mu.RUnlock()
+	if !ok {
+		return agent.DecisionResult{}, false
+	}
+	if now.Sub(entry.at) > c.ttl {
+		c.mu.Lock()
+		delete(c.items, key)
+		c.mu.Unlock()
+		return agent.DecisionResult{}, false
+	}
+	return entry.value, true
+}
+
+func (c *decisionCacheStore) Set(key string, value agent.DecisionResult, now time.Time) {
+	c.mu.Lock()
+	c.items[key] = decisionCacheEntry{
+		at:    now,
+		value: value,
+	}
+	c.mu.Unlock()
+}
+
+var askDecisionCache = newDecisionCacheStore(askDecisionCacheTTL)
 
 type askActionRecord struct {
 	Step   int
@@ -108,7 +159,7 @@ func runAskOnceWithSession(baseDir, prompt string, opts agent.AskOptions, confir
 	lastSignature := ""
 	for step := 1; step <= askMaxSteps; step++ {
 		decisionPrompt := buildAskPlannerPrompt(prompt, history, previousPrompts)
-		decision, err := agent.DecideWithPlugins(decisionPrompt, catalog, toolsCatalog, opts)
+		decision, _, err := decideWithCache(decisionPrompt, catalog, toolsCatalog, opts)
 		if err != nil {
 			if jsonOut {
 				jsonResult.Action = "error"
@@ -437,6 +488,33 @@ func buildAskPlannerPrompt(original string, history []askActionRecord, previousP
 		"Decide the next best step. If the task is complete, return action=answer with the final response.",
 	)
 	return strings.Join(lines, "\n")
+}
+
+func decideWithCache(prompt, pluginCatalog, toolCatalog string, opts agent.AskOptions) (agent.DecisionResult, bool, error) {
+	key := decisionCacheKey(prompt, pluginCatalog, toolCatalog, opts)
+	now := time.Now()
+	if cached, ok := askDecisionCache.Get(key, now); ok {
+		return cached, true, nil
+	}
+	decision, err := agent.DecideWithPlugins(prompt, pluginCatalog, toolCatalog, opts)
+	if err != nil {
+		return agent.DecisionResult{}, false, err
+	}
+	askDecisionCache.Set(key, decision, now)
+	return decision, false, nil
+}
+
+func decisionCacheKey(prompt, pluginCatalog, toolCatalog string, opts agent.AskOptions) string {
+	normalized := strings.Join([]string{
+		strings.TrimSpace(prompt),
+		strings.TrimSpace(pluginCatalog),
+		strings.TrimSpace(toolCatalog),
+		strings.ToLower(strings.TrimSpace(opts.Provider)),
+		strings.TrimSpace(opts.Model),
+		strings.TrimSpace(opts.BaseURL),
+	}, "\n---\n")
+	sum := sha256.Sum256([]byte(normalized))
+	return hex.EncodeToString(sum[:])
 }
 
 func decisionSignature(decision agent.DecisionResult) string {
