@@ -67,10 +67,9 @@ Repository guidelines for automated agents.
 
 ## PowerShell Plugin Conventions
 - Store public PowerShell plugin commands in `plugins/functions/*.ps1`.
-- Keep shared variables and helper utilities in `plugins/variables.ps1`.
-- If support helpers are needed for agent/plugin workflows, add them in `plugins/utils.ps1` so shared capabilities are centralized and reusable.
+- Each toolkit file must be fully standalone — all helpers, guards, and config defined internally.
 - Use `Set-StrictMode -Version Latest` and `$ErrorActionPreference = "Stop"` in plugin `.ps1` files.
-- Public plugin function names must be explicit and domain-prefixed (for example `g_*`, `stibs_*`).
+- Public plugin function names must be explicit and domain-prefixed (for example `sys_*`, `git_*`, `stibs_db_*`).
 - Private helper functions must start with `_` so they are not exposed as CLI commands.
 - Every public function must include comment-based help block immediately above the function:
   - `SYNOPSIS`
@@ -83,6 +82,101 @@ Repository guidelines for automated agents.
 - Use guard helpers (for example command/path checks) before calling external tools.
 - Validate plugin help blocks before finalizing changes:
   - `go run ./scripts/check_plugin_help.go`
+
+## Toolkit Construction Rules
+Toolkits are domain-specific PowerShell `.ps1` files under `plugins/functions/`.
+Each toolkit groups related functions behind a shared prefix.
+
+### File Layout
+Every toolkit file MUST follow this top-to-bottom structure:
+
+1. **Header banner** (bordered with `=` lines):
+   - Toolkit name and one-line purpose.
+   - Safety posture (e.g. "Non-destructive defaults, deterministic behavior").
+   - Entry point prefix (e.g. `sys_*`, `git_*`).
+   - Exhaustive `FUNCTIONS` index listing every public function in the file.
+2. **Strict mode block** (immediately after header):
+   ```
+   Set-StrictMode -Version Latest
+   $ErrorActionPreference = "Stop"
+   ```
+3. **Internal helpers section** (optional, prefixed with `_`).
+4. **Public functions**, grouped by logical sections separated with `# ------` or `# ======` dividers and a section title.
+
+### Naming
+- **File name**: `<Name>_Toolkit.ps1` (PascalCase name, underscore, `Toolkit`).
+  Use a numeric prefix for ordering when needed (e.g. `3_System_Toolkit.ps1`).
+  Domain-scoped toolkits go in subfolders (e.g. `STIBS/`, `m655/`).
+- **Public functions**: `<prefix>_<action>` all lowercase (e.g. `sys_uptime`, `git_status`, `browser_open`).
+  The prefix must be short, unique across all toolkits, and domain-descriptive.
+- **Private helpers**: start with `_` (e.g. `_assert_git_repo`, `_dc`, `_wifi_profiles`).
+  Private helpers are invisible to the plugin menu and the AI agent.
+- **Module-level variables** in toolkit files must use `$script:` scope when they are file-local constants.
+  Shared variables that multiple toolkits depend on belong in `plugins/variables.ps1`.
+
+### Help Blocks
+Every function (public AND private) MUST have a comment-based help block directly above it:
+```
+<#
+.SYNOPSIS
+One-line summary of what the function does.
+.DESCRIPTION
+More detail if the synopsis alone is not enough.
+.PARAMETER ParamName
+Description of the parameter.
+.EXAMPLE
+prefix_action -ParamName value
+#>
+```
+- `SYNOPSIS` and at least one `EXAMPLE` are mandatory.
+- `DESCRIPTION` is required when the synopsis is not self-explanatory.
+- `PARAMETER` is required for every declared parameter.
+- The `.EXAMPLE` must show actual invocation syntax (e.g. `dm prefix_action -Param value`).
+- Do NOT use placeholder help like "Invoke X" / "Helper/command function for X" in new code.
+
+### Parameters And Return Values
+- Mark mandatory parameters with `[Parameter(Mandatory)]` or `[Parameter(Mandatory = $true)]`.
+- Use `[Parameter(Position = N)]` for positional convenience parameters.
+- Use `[ValidateSet(...)]` when the parameter domain is closed (e.g. service names).
+- Return structured `[pscustomobject]@{ ... }` objects instead of raw strings when the output has multiple fields.
+  This allows pipeline processing, AI consumption, and consistent formatting.
+
+### Guard Helpers
+- Call `_assert_command_available -Name <tool>` before invoking external CLI tools (docker, git, netsh, m365, etc.).
+- Call `_assert_path_exists -Path <path>` before reading/writing paths that may not exist.
+- Define these helpers as private `_` functions inside the toolkit itself (each toolkit carries its own copy).
+
+### Safety Defaults
+- Default to non-destructive, read-only behavior.
+- Destructive or state-changing operations must require an explicit `-Force` switch or an interactive confirmation via `_confirm_action`.
+- Never perform irreversible side effects without either confirmation or `-Force`.
+
+### Standalone Requirement
+Every toolkit MUST be fully self-contained with **zero** cross-file dependencies:
+- A toolkit file must **not** call functions defined in any other `.ps1` file — neither other toolkits nor shared files like `utils.ps1` or `variables.ps1`.
+- Each toolkit must define its own private guard helpers (`_assert_command_available`, `_assert_path_exists`, `_confirm_action`) and config loaders internally.
+- Configuration values (paths, credentials, URLs) must be loaded via a local `_env_or_default` helper so they remain overridable through environment variables.
+- This guarantees that each `.ps1` file can be loaded, tested, and reasoned about in complete isolation — both by humans and AI agents — with no hidden dependencies.
+
+### Toolkit Generator Integration
+The `dm toolkit new` / `dm toolkit add` commands generate scaffolds that conform to these rules.
+- `dm toolkit new --name <Name> --prefix <prefix>` creates a new file with header, strict mode, and a starter `<prefix>_info` function.
+- `dm toolkit add --file <path> --prefix <prefix> --func <suffix>` appends a new function scaffold to an existing toolkit.
+- `dm toolkit validate` checks all toolkits for strict mode, help blocks, and duplicate function names.
+- After manual edits, always run `dm toolkit validate` to catch regressions.
+
+### Checklist For New Toolkits
+1. Choose a unique prefix not already used by any existing toolkit.
+2. Create file via `dm toolkit new` or manually with the header banner template.
+3. Add `Set-StrictMode` + `$ErrorActionPreference` immediately after the header.
+4. Verify the toolkit is truly standalone — no calls to functions in any other `.ps1` file.
+5. Include private guard helpers (`_assert_command_available`, `_assert_path_exists`) and config loaders inside the toolkit.
+6. Write full help blocks on every function.
+7. Return `[pscustomobject]` for multi-field outputs.
+8. Gate destructive actions behind `-Force` or `_confirm_action`.
+9. Update the `FUNCTIONS` index in the header when adding/removing functions.
+10. Run `dm toolkit validate` before finalizing.
+11. Run `go run ./scripts/check_plugin_help.go` to verify help block parsing.
 
 ## Menu And Output Styling
 - Use shared color helpers from `internal/ui/pretty.go` (for example `Accent`, `Warn`, `Muted`, `Prompt`) for interactive menus.

@@ -1,12 +1,12 @@
 # =============================================================================
-# BROWSER TOOLKIT – Local browser operational layer
-# Production-safe local browser helpers
-# Non-destructive defaults, deterministic behavior, no admin requirements
+# BROWSER TOOLKIT – Local browser operational layer (standalone)
+# Manage and launch the default browser.
+# Safety: Non-destructive defaults. Close-all requires -Force or confirmation.
 # Entry point: browser_*
 #
 # FUNCTIONS
+#   browser_standard
 #   browser_close_all
-#	browser_standard 
 #   browser_open
 #   browser_localhost
 #   browser_wait_and_open
@@ -17,72 +17,35 @@
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
+# -----------------------------------------------------------------------------
+# Internal helpers
+# -----------------------------------------------------------------------------
+
 <#
 .SYNOPSIS
-Invoke browser_close_all.
-.DESCRIPTION
-Helper/command function for browser_close_all.
+Ask for yes/no confirmation before a risky action.
+.PARAMETER Prompt
+Message shown to the user.
 .EXAMPLE
-dm browser_close_all
+if (-not (_confirm_action -Prompt "Continue?")) { return }
 #>
-function browser_close_all {
-    param()
-
-    $regPath = "HKCU:\Software\Microsoft\Windows\Shell\Associations\UrlAssociations\http\UserChoice"
-
-    if (-not (Test-Path $regPath)) {
-        throw "Cannot determine default browser."
-    }
-
-    $progId = (Get-ItemProperty -Path $regPath).ProgId
-
-    $processMap = @{
-        "ChromeHTML"  = "chrome"
-        "MSEdgeHTM"   = "msedge"
-        "FirefoxURL"  = "firefox"
-        "OperaStable" = "opera"
-        "BraveHTML"   = "brave"
-        "SafariURL"   = "safari"
-    }
-
-    $processName = $processMap[$progId]
-
-    if (-not $processName) {
-        throw "Unsupported or unknown default browser ($progId)."
-    }
-
-    $procs = Get-Process -Name $processName -ErrorAction SilentlyContinue
-
-    if (-not $procs) {
-        return [pscustomobject]@{
-            Browser = $processName
-            Closed  = 0
-            Status  = "No running instances"
-        }
-    }
-
-    $count = $procs.Count
-    $procs | Stop-Process -Force
-
-    [pscustomobject]@{
-        Browser = $processName
-        Closed  = $count
-        Status  = "Terminated"
-    }
+function _confirm_action {
+    param([Parameter(Mandatory = $true)][string]$Prompt)
+    $answer = Read-Host "$Prompt [y/N]"
+    if ([string]::IsNullOrWhiteSpace($answer)) { return $false }
+    return $answer.Trim().ToLowerInvariant() -in @("y", "yes")
 }
 
-
 <#
 .SYNOPSIS
-Invoke browser_standard.
+Resolve the default browser from the Windows registry.
 .DESCRIPTION
-Helper/command function for browser_standard.
+Returns the process name and display name of the default browser.
+Throws if the registry key is missing or the browser is unknown.
 .EXAMPLE
-dm browser_standard
+_resolve_default_browser
 #>
-function browser_standard {
-    param()
-
+function _resolve_default_browser {
     $regPath = "HKCU:\Software\Microsoft\Windows\Shell\Associations\UrlAssociations\http\UserChoice"
 
     if (-not (Test-Path $regPath)) {
@@ -92,37 +55,106 @@ function browser_standard {
     $progId = (Get-ItemProperty -Path $regPath).ProgId
 
     $browserMap = @{
-        "ChromeHTML"      = "Google Chrome"
-        "MSEdgeHTM"       = "Microsoft Edge"
-        "FirefoxURL"      = "Mozilla Firefox"
-        "OperaStable"     = "Opera"
-        "SafariURL"       = "Safari"
-        "BraveHTML"       = "Brave"
+        "ChromeHTML"  = @{ Process = "chrome";   Name = "Google Chrome" }
+        "MSEdgeHTM"   = @{ Process = "msedge";   Name = "Microsoft Edge" }
+        "FirefoxURL"  = @{ Process = "firefox";  Name = "Mozilla Firefox" }
+        "OperaStable" = @{ Process = "opera";    Name = "Opera" }
+        "BraveHTML"   = @{ Process = "brave";    Name = "Brave" }
+        "SafariURL"   = @{ Process = "safari";   Name = "Safari" }
     }
 
-    $browserName = $browserMap[$progId]
+    $entry = $browserMap[$progId]
 
-    if (-not $browserName) {
-        $browserName = "Unknown ($progId)"
+    if (-not $entry) {
+        throw "Unsupported or unknown default browser ($progId)."
     }
 
-    [pscustomobject]@{
-        BrowserName = $browserName
+    return [pscustomobject]@{
         ProgId      = $progId
+        ProcessName = $entry.Process
+        BrowserName = $entry.Name
     }
 }
 
+# -----------------------------------------------------------------------------
+# Info
+# -----------------------------------------------------------------------------
 
-# -----------------------------------------------------------------------------
-# Open any URL in default browser
-# -----------------------------------------------------------------------------
 <#
 .SYNOPSIS
-Invoke browser_open.
+Show the default browser name and ProgId.
 .DESCRIPTION
-Helper/command function for browser_open.
+Reads the Windows registry to identify the current default browser.
 .EXAMPLE
-dm browser_open
+browser_standard
+#>
+function browser_standard {
+    _resolve_default_browser
+}
+
+# -----------------------------------------------------------------------------
+# Close
+# -----------------------------------------------------------------------------
+
+<#
+.SYNOPSIS
+Close all instances of the default browser.
+.DESCRIPTION
+Detects the default browser via registry and terminates all its processes.
+Requires -Force or interactive confirmation.
+.PARAMETER Force
+Skip interactive confirmation.
+.EXAMPLE
+browser_close_all -Force
+#>
+function browser_close_all {
+    param([switch]$Force)
+
+    $browser = _resolve_default_browser
+    $procs = Get-Process -Name $browser.ProcessName -ErrorAction SilentlyContinue
+
+    if (-not $procs) {
+        return [pscustomobject]@{
+            Browser = $browser.BrowserName
+            Closed  = 0
+            Status  = "No running instances"
+        }
+    }
+
+    if (-not $Force) {
+        $count = $procs.Count
+        if (-not (_confirm_action -Prompt "Close $count $($browser.BrowserName) process(es)?")) {
+            return [pscustomobject]@{
+                Browser = $browser.BrowserName
+                Closed  = 0
+                Status  = "Cancelled"
+            }
+        }
+    }
+
+    $count = $procs.Count
+    $procs | Stop-Process -Force
+
+    return [pscustomobject]@{
+        Browser = $browser.BrowserName
+        Closed  = $count
+        Status  = "Terminated"
+    }
+}
+
+# -----------------------------------------------------------------------------
+# Open
+# -----------------------------------------------------------------------------
+
+<#
+.SYNOPSIS
+Open a URL in the default browser.
+.DESCRIPTION
+Launches the specified URL using the system default browser.
+.PARAMETER Url
+URL to open.
+.EXAMPLE
+browser_open -Url "https://github.com"
 #>
 function browser_open {
     param(
@@ -132,23 +164,26 @@ function browser_open {
 
     Start-Process $Url
 
-    [pscustomobject]@{
+    return [pscustomobject]@{
         Action = "Open"
         Url    = $Url
         Status = "Launched"
     }
 }
 
-# -----------------------------------------------------------------------------
-# Open localhost with port
-# -----------------------------------------------------------------------------
 <#
 .SYNOPSIS
-Invoke browser_localhost.
+Open localhost at a given port in the browser.
 .DESCRIPTION
-Helper/command function for browser_localhost.
+Builds an http://localhost:<Port>/<Path> URL and opens it.
+.PARAMETER Port
+TCP port number (1-65535).
+.PARAMETER Path
+Optional URL path appended after the port.
 .EXAMPLE
-dm browser_localhost
+browser_localhost -Port 3000
+.EXAMPLE
+browser_localhost -Port 4200 -Path "admin"
 #>
 function browser_localhost {
     param(
@@ -171,23 +206,52 @@ function browser_localhost {
 
     Start-Process $url
 
-    [pscustomobject]@{
+    return [pscustomobject]@{
         Action = "OpenLocalhost"
         Url    = $url
         Status = "Launched"
     }
 }
 
-# -----------------------------------------------------------------------------
-# Test if localhost port is open
-# -----------------------------------------------------------------------------
 <#
 .SYNOPSIS
-Invoke browser_test_port.
+Open multiple URLs in the default browser.
 .DESCRIPTION
-Helper/command function for browser_test_port.
+Launches each URL in sequence using the system default browser.
+.PARAMETER Urls
+Array of URLs to open.
 .EXAMPLE
-dm browser_test_port
+browser_open_many -Urls "https://github.com","https://google.com"
+#>
+function browser_open_many {
+    param(
+        [Parameter(Mandatory = $true, Position = 0)]
+        [string[]]$Urls
+    )
+
+    foreach ($url in $Urls) {
+        Start-Process $url
+    }
+
+    return [pscustomobject]@{
+        Count  = $Urls.Count
+        Status = "Launched"
+    }
+}
+
+# -----------------------------------------------------------------------------
+# Port testing
+# -----------------------------------------------------------------------------
+
+<#
+.SYNOPSIS
+Test if a localhost port is open.
+.DESCRIPTION
+Uses Test-NetConnection to check TCP connectivity on localhost.
+.PARAMETER Port
+TCP port number to test (1-65535).
+.EXAMPLE
+browser_test_port -Port 8080
 #>
 function browser_test_port {
     param(
@@ -204,22 +268,27 @@ function browser_test_port {
         -Port $Port `
         -WarningAction SilentlyContinue
 
-    [pscustomobject]@{
+    return [pscustomobject]@{
         Port   = $Port
         IsOpen = $result.TcpTestSucceeded
     }
 }
 
-# -----------------------------------------------------------------------------
-# Wait for localhost port and open browser
-# -----------------------------------------------------------------------------
 <#
 .SYNOPSIS
-Invoke browser_wait_and_open.
+Wait for a localhost port to become available then open browser.
 .DESCRIPTION
-Helper/command function for browser_wait_and_open.
+Polls the port at intervals and opens the URL once it responds.
+.PARAMETER Port
+TCP port to wait for (1-65535).
+.PARAMETER TimeoutSeconds
+Maximum seconds to wait (default 30).
+.PARAMETER PollIntervalSeconds
+Seconds between checks (default 1).
 .EXAMPLE
-dm browser_wait_and_open
+browser_wait_and_open -Port 4200
+.EXAMPLE
+browser_wait_and_open -Port 3000 -TimeoutSeconds 60
 #>
 function browser_wait_and_open {
     param(
@@ -263,31 +332,4 @@ function browser_wait_and_open {
     }
 
     throw "Port $Port did not become available within $TimeoutSeconds seconds."
-}
-
-# -----------------------------------------------------------------------------
-# Open multiple URLs
-# -----------------------------------------------------------------------------
-<#
-.SYNOPSIS
-Invoke browser_open_many.
-.DESCRIPTION
-Helper/command function for browser_open_many.
-.EXAMPLE
-dm browser_open_many
-#>
-function browser_open_many {
-    param(
-        [Parameter(Mandatory = $true, Position = 0)]
-        [string[]]$Urls
-    )
-
-    foreach ($url in $Urls) {
-        Start-Process $url
-    }
-
-    [pscustomobject]@{
-        Count  = $Urls.Count
-        Status = "Launched"
-    }
 }

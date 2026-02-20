@@ -1,7 +1,7 @@
 # =============================================================================
-# DM HELP TOOLKIT – AI Introspection & Discovery Layer
-# Runtime inspection helpers for DM toolkits
-# Non-destructive, read-only, deterministic behavior
+# HELP TOOLKIT – AI introspection & discovery layer (standalone)
+# Runtime inspection helpers for DM toolkits.
+# Safety: Read-only — inspects loaded functions, never modifies state.
 # Entry point: help_*
 #
 # FUNCTIONS
@@ -23,15 +23,17 @@
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
-# =========================
-# INTERNAL HELPERS
-# =========================
+# -----------------------------------------------------------------------------
+# Internal helpers
+# -----------------------------------------------------------------------------
 
 <#
 .SYNOPSIS
 Returns all toolkit functions.
 .DESCRIPTION
 Returns all functions following toolkit naming convention (prefix_action).
+.EXAMPLE
+_help_get_toolkit_functions
 #>
 function _help_get_toolkit_functions {
     Get-Command -CommandType Function |
@@ -45,19 +47,21 @@ Extracts prefix from function name.
 Returns prefix portion before first underscore.
 .PARAMETER Name
 Target function name.
+.EXAMPLE
+_help_get_prefix -Name "sys_uptime"
 #>
 function _help_get_prefix {
     param(
-        [Parameter(Mandatory)]
+        [Parameter(Mandatory = $true)]
         [string]$Name
     )
 
     return ($Name -split "_")[0]
 }
 
-# =========================
-# DISCOVERY
-# =========================
+# -----------------------------------------------------------------------------
+# Discovery
+# -----------------------------------------------------------------------------
 
 <#
 .SYNOPSIS
@@ -85,7 +89,7 @@ help_list_prefix -Prefix sys
 #>
 function help_list_prefix {
     param(
-        [Parameter(Mandatory)]
+        [Parameter(Mandatory = $true)]
         [string]$Prefix
     )
 
@@ -134,7 +138,7 @@ help_exists -Name sys_uptime
 #>
 function help_exists {
     param(
-        [Parameter(Mandatory)]
+        [Parameter(Mandatory = $true)]
         [string]$Name
     )
 
@@ -146,9 +150,9 @@ function help_exists {
     return $true
 }
 
-# =========================
-# DOCUMENTATION
-# =========================
+# -----------------------------------------------------------------------------
+# Documentation
+# -----------------------------------------------------------------------------
 
 <#
 .SYNOPSIS
@@ -162,7 +166,7 @@ help_function -Name sys_uptime
 #>
 function help_function {
     param(
-        [Parameter(Mandatory)]
+        [Parameter(Mandatory = $true)]
         [string]$Name
     )
 
@@ -185,7 +189,7 @@ help_parameters -Name sys_ping
 #>
 function help_parameters {
     param(
-        [Parameter(Mandatory)]
+        [Parameter(Mandatory = $true)]
         [string]$Name
     )
 
@@ -209,7 +213,7 @@ help_examples -Name sys_ping
 #>
 function help_examples {
     param(
-        [Parameter(Mandatory)]
+        [Parameter(Mandatory = $true)]
         [string]$Name
     )
 
@@ -220,9 +224,9 @@ function help_examples {
     Get-Help $Name -Examples
 }
 
-# =========================
-# LOCATION & SOURCE
-# =========================
+# -----------------------------------------------------------------------------
+# Location & Source
+# -----------------------------------------------------------------------------
 
 <#
 .SYNOPSIS
@@ -236,7 +240,7 @@ help_where -Name sys_uptime
 #>
 function help_where {
     param(
-        [Parameter(Mandatory)]
+        [Parameter(Mandatory = $true)]
         [string]$Name
     )
 
@@ -246,9 +250,9 @@ function help_where {
 
     $cmd = Get-Command $Name
 
-    [pscustomobject]@{
+    return [pscustomobject]@{
         Name       = $cmd.Name
-        CommandType= $cmd.CommandType
+        CommandType = $cmd.CommandType
         Module     = $cmd.ModuleName
         Source     = $cmd.Source
         ScriptPath = $cmd.ScriptBlock.File
@@ -267,7 +271,7 @@ help_source -Name sys_uptime
 #>
 function help_source {
     param(
-        [Parameter(Mandatory)]
+        [Parameter(Mandatory = $true)]
         [string]$Name
     )
 
@@ -278,9 +282,9 @@ function help_source {
     (Get-Command $Name).ScriptBlock.ToString()
 }
 
-# =========================
-# AI SUPPORT
-# =========================
+# -----------------------------------------------------------------------------
+# AI support
+# -----------------------------------------------------------------------------
 
 <#
 .SYNOPSIS
@@ -299,19 +303,19 @@ function help_export_index {
             $help = Get-Help $_.Name -ErrorAction SilentlyContinue
 
             [pscustomobject]@{
-                Name        = $_.Name
-                Prefix      = _help_get_prefix $_.Name
-                Module      = $_.ModuleName
-                Parameters  = ($_.Parameters.Keys -join ", ")
-                Synopsis    = $help.Synopsis
-                ScriptPath  = $_.ScriptBlock.File
+                Name       = $_.Name
+                Prefix     = _help_get_prefix $_.Name
+                Module     = $_.ModuleName
+                Parameters = ($_.Parameters.Keys -join ", ")
+                Synopsis   = $help.Synopsis
+                ScriptPath = $_.ScriptBlock.File
             }
         }
 }
 
-# =========================
-# BUILT-IN COMMANDS
-# =========================
+# -----------------------------------------------------------------------------
+# Built-in commands
+# -----------------------------------------------------------------------------
 
 <#
 .SYNOPSIS
@@ -319,17 +323,17 @@ List built-in PowerShell commands.
 .DESCRIPTION
 Returns built-in cmdlets, aliases and module functions.
 .PARAMETER Name
-Optional name filter.
+Optional name filter (default: all).
 .EXAMPLE
 help_builtin_list
+.EXAMPLE
+help_builtin_list -Name "Get-*"
 #>
 function help_builtin_list {
-    param(
-        [string]$Name = "*"
-    )
+    param([string]$Name = "*")
 
     Get-Command -Name $Name |
-        Where-Object { $_.ModuleName -ne $null } |
+        Where-Object { $null -ne $_.ModuleName } |
         Sort-Object Name |
         Select-Object Name, CommandType, ModuleName
 }
@@ -346,27 +350,26 @@ help_builtin_info -Name Get-Process
 #>
 function help_builtin_info {
     param(
-        [Parameter(Mandatory)]
+        [Parameter(Mandatory = $true)]
         [string]$Name
     )
 
     $cmd = Get-Command -Name $Name -ErrorAction Stop
 
-    if ($cmd.ModuleName -eq $null) {
+    if ($null -eq $cmd.ModuleName) {
         throw "Command '$Name' is not a built-in module command."
     }
 
     $help = Get-Help $Name -Full -ErrorAction SilentlyContinue
 
-    [pscustomobject]@{
-        Name        = $cmd.Name
+    return [pscustomobject]@{
+        Name       = $cmd.Name
         CommandType = $cmd.CommandType
-        Module      = $cmd.ModuleName
-        Version     = $cmd.Version
-        Source      = $cmd.Source
-        Parameters  = ($cmd.Parameters.Keys -join ", ")
-        Synopsis    = $help.Synopsis
-        Syntax      = ($help.Syntax | Out-String).Trim()
+        Module     = $cmd.ModuleName
+        Version    = $cmd.Version
+        Source     = $cmd.Source
+        Parameters = ($cmd.Parameters.Keys -join ", ")
+        Synopsis   = $help.Synopsis
+        Syntax     = ($help.Syntax | Out-String).Trim()
     }
 }
-

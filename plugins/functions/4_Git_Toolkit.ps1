@@ -1,7 +1,7 @@
 # =============================================================================
-# DM GIT TOOLKIT – Local Git Operational Layer
-# Production-safe Git helpers for local development environments
-# Non-destructive defaults, deterministic behavior, no admin requirements
+# GIT TOOLKIT – Local Git operational layer (standalone)
+# Git helpers for local development environments.
+# Safety: Non-destructive defaults. Remote delete requires -Force or confirmation.
 # Entry point: git_*
 #
 # FUNCTIONS
@@ -42,6 +42,40 @@
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
+# -----------------------------------------------------------------------------
+# Internal helpers
+# -----------------------------------------------------------------------------
+
+<#
+.SYNOPSIS
+Ensure a command is available in PATH.
+.PARAMETER Name
+Command name to validate.
+.EXAMPLE
+_assert_command_available -Name git
+#>
+function _assert_command_available {
+    param([Parameter(Mandatory = $true)][string]$Name)
+    if (-not (Get-Command -Name $Name -ErrorAction SilentlyContinue)) {
+        throw "Required command '$Name' was not found in PATH."
+    }
+}
+
+<#
+.SYNOPSIS
+Ask for yes/no confirmation before a risky action.
+.PARAMETER Prompt
+Message shown to the user.
+.EXAMPLE
+if (-not (_confirm_action -Prompt "Continue?")) { return }
+#>
+function _confirm_action {
+    param([Parameter(Mandatory = $true)][string]$Prompt)
+    $answer = Read-Host "$Prompt [y/N]"
+    if ([string]::IsNullOrWhiteSpace($answer)) { return $false }
+    return $answer.Trim().ToLowerInvariant() -in @("y", "yes")
+}
+
 <#
 .SYNOPSIS
 Ensure current directory is inside a Git repository.
@@ -58,178 +92,82 @@ function _assert_git_repo {
     }
 }
 
+# -----------------------------------------------------------------------------
+# Read operations
+# -----------------------------------------------------------------------------
+
 <#
 .SYNOPSIS
-Invoke git_status.
+Show working tree status.
 .DESCRIPTION
-Helper/command function for git_status.
+Displays staged, unstaged and untracked files.
 .EXAMPLE
-dm git_status
+git_status
 #>
 function git_status { _assert_git_repo; git status }
+
 <#
 .SYNOPSIS
-Invoke git_branch_current.
+Show current branch name.
 .DESCRIPTION
-Helper/command function for git_branch_current.
+Prints the name of the currently checked-out branch.
 .EXAMPLE
-dm git_branch_current
+git_branch_current
 #>
 function git_branch_current { _assert_git_repo; git branch --show-current }
+
 <#
 .SYNOPSIS
-Invoke git_branch_list.
+List all local and remote branches.
 .DESCRIPTION
-Helper/command function for git_branch_list.
+Shows every branch including remotes.
 .EXAMPLE
-dm git_branch_list
+git_branch_list
 #>
 function git_branch_list { _assert_git_repo; git branch -a }
-<#
-.SYNOPSIS
-Invoke git_fetch.
-.DESCRIPTION
-Helper/command function for git_fetch.
-.EXAMPLE
-dm git_fetch
-#>
-function git_fetch { _assert_git_repo; git fetch --all --prune }
-<#
-.SYNOPSIS
-Invoke git_pull.
-.DESCRIPTION
-Helper/command function for git_pull.
-.EXAMPLE
-dm git_pull
-#>
-function git_pull { _assert_git_repo; git pull }
-<#
-.SYNOPSIS
-Invoke git_pull_rebase.
-.DESCRIPTION
-Helper/command function for git_pull_rebase.
-.EXAMPLE
-dm git_pull_rebase
-#>
-function git_pull_rebase { _assert_git_repo; git pull --rebase }
-<#
-.SYNOPSIS
-Invoke git_push.
-.DESCRIPTION
-Helper/command function for git_push.
-.EXAMPLE
-dm git_push
-#>
-function git_push { _assert_git_repo; git push }
-<#
-.SYNOPSIS
-Invoke git_push_force_with_lease.
-.DESCRIPTION
-Helper/command function for git_push_force_with_lease.
-.EXAMPLE
-dm git_push_force_with_lease
-#>
-function git_push_force_with_lease { _assert_git_repo; git push --force-with-lease }
-<#
-.SYNOPSIS
-Invoke git_add_all.
-.DESCRIPTION
-Helper/command function for git_add_all.
-.EXAMPLE
-dm git_add_all
-#>
-function git_add_all { _assert_git_repo; git add . }
 
 <#
 .SYNOPSIS
-Invoke git_commit.
+Show recent commit log with stats.
 .DESCRIPTION
-Helper/command function for git_commit.
+Displays last 20 commits with file change statistics.
 .EXAMPLE
-dm git_commit
-#>
-function git_commit {
-    param([Parameter(Mandatory=$true)][string]$Message)
-    _assert_git_repo
-    git commit -m "$Message"
-}
-
-<#
-.SYNOPSIS
-Invoke git_add_commit.
-.DESCRIPTION
-Helper/command function for git_add_commit.
-.EXAMPLE
-dm git_add_commit
-#>
-function git_add_commit {
-    param([Parameter(Mandatory=$true)][string]$Message)
-    _assert_git_repo
-    git add .
-    git commit -m "$Message"
-}
-
-<#
-.SYNOPSIS
-Invoke git_commit_amend.
-.DESCRIPTION
-Helper/command function for git_commit_amend.
-.EXAMPLE
-dm git_commit_amend
-#>
-function git_commit_amend {
-    param([Parameter(Mandatory=$true)][string]$Message)
-    _assert_git_repo
-    git commit --amend -m "$Message"
-}
-
-<#
-.SYNOPSIS
-Invoke git_commit_amend_noedit.
-.DESCRIPTION
-Helper/command function for git_commit_amend_noedit.
-.EXAMPLE
-dm git_commit_amend_noedit
-#>
-function git_commit_amend_noedit { _assert_git_repo; git commit --amend --no-edit }
-<#
-.SYNOPSIS
-Invoke git_log.
-.DESCRIPTION
-Helper/command function for git_log.
-.EXAMPLE
-dm git_log
+git_log
 #>
 function git_log { _assert_git_repo; git log --decorate --stat -n 20 }
+
 <#
 .SYNOPSIS
-Invoke git_log_graph_oneline.
+Show commit graph as one-line-per-commit.
 .DESCRIPTION
-Helper/command function for git_log_graph_oneline.
+Displays all branches as an ASCII graph with abbreviated commits.
 .EXAMPLE
-dm git_log_graph_oneline
+git_log_graph_oneline
 #>
 function git_log_graph_oneline { _assert_git_repo; git log --oneline --graph --decorate --all }
+
 <#
 .SYNOPSIS
-Invoke git_diff.
+Show unstaged and staged diffs.
 .DESCRIPTION
-Helper/command function for git_diff.
+Displays both working directory changes and staged changes.
 .EXAMPLE
-dm git_diff
+git_diff
 #>
 function git_diff { _assert_git_repo; git diff; git diff --cached }
 
 <#
 .SYNOPSIS
-Invoke git_diff_file.
+Show diff for a specific file.
 .DESCRIPTION
-Helper/command function for git_diff_file.
+Displays unstaged and staged changes for the given file path.
+.PARAMETER Path
+File path to diff.
 .EXAMPLE
-dm git_diff_file
+git_diff_file -Path src/main.go
 #>
 function git_diff_file {
-    param([Parameter(Mandatory=$true)][string]$Path)
+    param([Parameter(Mandatory = $true)][string]$Path)
     _assert_git_repo
     git diff -- "$Path"
     git diff --cached -- "$Path"
@@ -237,145 +175,250 @@ function git_diff_file {
 
 <#
 .SYNOPSIS
-Invoke git_log_file.
+Show commit history for a specific file.
 .DESCRIPTION
-Helper/command function for git_log_file.
+Lists one-line commits that touched the given file.
+.PARAMETER Path
+File path to inspect.
 .EXAMPLE
-dm git_log_file
+git_log_file -Path src/main.go
 #>
 function git_log_file {
-    param([Parameter(Mandatory=$true)][string]$Path)
+    param([Parameter(Mandatory = $true)][string]$Path)
     _assert_git_repo
     git log --oneline -- "$Path"
 }
 
 <#
 .SYNOPSIS
-Invoke git_grep.
+Search tracked files for a text pattern.
 .DESCRIPTION
-Helper/command function for git_grep.
+Runs git grep to find matching lines in the repository.
+.PARAMETER Pattern
+Text or regex pattern to search for.
 .EXAMPLE
-dm git_grep
+git_grep -Pattern "TODO"
 #>
 function git_grep {
-    param([Parameter(Mandatory=$true)][string]$Pattern)
+    param([Parameter(Mandatory = $true)][string]$Pattern)
     _assert_git_repo
     git grep -- "$Pattern"
 }
 
 <#
 .SYNOPSIS
-Invoke git_show.
+Show details of a commit.
 .DESCRIPTION
-Helper/command function for git_show.
+Displays commit metadata and diff for the given ref (default HEAD).
+.PARAMETER Ref
+Commit reference (default HEAD).
 .EXAMPLE
-dm git_show
+git_show -Ref HEAD~1
 #>
 function git_show {
-    param([string]$Ref="HEAD")
+    param([string]$Ref = "HEAD")
     _assert_git_repo
     git show "$Ref"
 }
 
 <#
 .SYNOPSIS
-Invoke git_remote_list.
+List configured remotes with URLs.
 .DESCRIPTION
-Helper/command function for git_remote_list.
+Shows all remotes and their fetch/push URLs.
 .EXAMPLE
-dm git_remote_list
+git_remote_list
 #>
 function git_remote_list { _assert_git_repo; git remote -v }
+
 <#
 .SYNOPSIS
-Invoke git_tag_list.
+List all tags.
 .DESCRIPTION
-Helper/command function for git_tag_list.
+Shows every tag in the repository.
 .EXAMPLE
-dm git_tag_list
+git_tag_list
 #>
 function git_tag_list { _assert_git_repo; git tag --list }
 
+# -----------------------------------------------------------------------------
+# Fetch / Pull / Push
+# -----------------------------------------------------------------------------
+
 <#
 .SYNOPSIS
-Invoke git_tag_create.
+Fetch all remotes and prune stale branches.
 .DESCRIPTION
-Helper/command function for git_tag_create.
+Runs git fetch --all --prune.
 .EXAMPLE
-dm git_tag_create
+git_fetch
 #>
-function git_tag_create {
-    param(
-        [Parameter(Mandatory=$true)][string]$Name,
-        [Parameter(Mandatory=$true)][string]$Message
-    )
+function git_fetch { _assert_git_repo; git fetch --all --prune }
+
+<#
+.SYNOPSIS
+Pull latest changes from remote.
+.DESCRIPTION
+Runs git pull with default merge strategy.
+.EXAMPLE
+git_pull
+#>
+function git_pull { _assert_git_repo; git pull }
+
+<#
+.SYNOPSIS
+Pull with rebase from remote.
+.DESCRIPTION
+Runs git pull --rebase to replay local commits on top of upstream.
+.EXAMPLE
+git_pull_rebase
+#>
+function git_pull_rebase { _assert_git_repo; git pull --rebase }
+
+<#
+.SYNOPSIS
+Push commits to remote.
+.DESCRIPTION
+Runs git push to the tracked upstream branch.
+.EXAMPLE
+git_push
+#>
+function git_push { _assert_git_repo; git push }
+
+<#
+.SYNOPSIS
+Force-push with lease safety.
+.DESCRIPTION
+Pushes forcefully but aborts if remote has new commits since last fetch.
+.EXAMPLE
+git_push_force_with_lease
+#>
+function git_push_force_with_lease { _assert_git_repo; git push --force-with-lease }
+
+# -----------------------------------------------------------------------------
+# Stage / Commit
+# -----------------------------------------------------------------------------
+
+<#
+.SYNOPSIS
+Stage all changes in working directory.
+.DESCRIPTION
+Runs git add . to stage all modified, new and deleted files.
+.EXAMPLE
+git_add_all
+#>
+function git_add_all { _assert_git_repo; git add . }
+
+<#
+.SYNOPSIS
+Commit staged changes with a message.
+.DESCRIPTION
+Runs git commit -m with the provided message.
+.PARAMETER Message
+Commit message text.
+.EXAMPLE
+git_commit -Message "Fix login bug"
+#>
+function git_commit {
+    param([Parameter(Mandatory = $true)][string]$Message)
     _assert_git_repo
-    git tag -a "$Name" -m "$Message"
+    git commit -m "$Message"
 }
 
 <#
 .SYNOPSIS
-Invoke git_tag_push.
+Stage all changes and commit with a message.
 .DESCRIPTION
-Helper/command function for git_tag_push.
+Runs git add . followed by git commit -m.
+.PARAMETER Message
+Commit message text.
 .EXAMPLE
-dm git_tag_push
+git_add_commit -Message "Add new feature"
 #>
-function git_tag_push {
-    param([Parameter(Mandatory=$true)][string]$Name)
+function git_add_commit {
+    param([Parameter(Mandatory = $true)][string]$Message)
     _assert_git_repo
-    git push origin "$Name"
+    git add .
+    git commit -m "$Message"
 }
 
 <#
 .SYNOPSIS
-Invoke git_tag_push_all.
+Amend last commit with a new message.
 .DESCRIPTION
-Helper/command function for git_tag_push_all.
+Runs git commit --amend -m to replace the last commit message.
+.PARAMETER Message
+New commit message.
 .EXAMPLE
-dm git_tag_push_all
+git_commit_amend -Message "Corrected message"
 #>
-function git_tag_push_all { _assert_git_repo; git push --tags }
+function git_commit_amend {
+    param([Parameter(Mandatory = $true)][string]$Message)
+    _assert_git_repo
+    git commit --amend -m "$Message"
+}
 
 <#
 .SYNOPSIS
-Invoke git_switch.
+Amend last commit keeping the same message.
 .DESCRIPTION
-Helper/command function for git_switch.
+Runs git commit --amend --no-edit to add staged changes to the last commit.
 .EXAMPLE
-dm git_switch
+git_commit_amend_noedit
+#>
+function git_commit_amend_noedit { _assert_git_repo; git commit --amend --no-edit }
+
+# -----------------------------------------------------------------------------
+# Branch management
+# -----------------------------------------------------------------------------
+
+<#
+.SYNOPSIS
+Switch to an existing branch.
+.DESCRIPTION
+Checks out the specified branch using git switch.
+.PARAMETER Branch
+Target branch name.
+.EXAMPLE
+git_switch -Branch develop
 #>
 function git_switch {
-    param([Parameter(Mandatory=$true)][string]$Branch)
+    param([Parameter(Mandatory = $true)][string]$Branch)
     _assert_git_repo
     git switch "$Branch"
 }
 
 <#
 .SYNOPSIS
-Invoke git_checkout_new.
+Create and switch to a new branch.
 .DESCRIPTION
-Helper/command function for git_checkout_new.
+Runs git checkout -b to create a new branch from the current HEAD.
+.PARAMETER Branch
+New branch name.
 .EXAMPLE
-dm git_checkout_new
+git_checkout_new -Branch feature/login
 #>
 function git_checkout_new {
-    param([Parameter(Mandatory=$true)][string]$Branch)
+    param([Parameter(Mandatory = $true)][string]$Branch)
     _assert_git_repo
     git checkout -b "$Branch"
 }
 
 <#
 .SYNOPSIS
-Invoke git_branch_delete_local.
+Delete a local branch.
 .DESCRIPTION
-Helper/command function for git_branch_delete_local.
+Removes a local branch. Use -Force for unmerged branches.
+.PARAMETER Branch
+Branch name to delete.
+.PARAMETER Force
+Use -D instead of -d to force-delete unmerged branches.
 .EXAMPLE
-dm git_branch_delete_local
+git_branch_delete_local -Branch old-feature
 #>
 function git_branch_delete_local {
     param(
-        [Parameter(Mandatory=$true)][string]$Branch,
+        [Parameter(Mandatory = $true)][string]$Branch,
         [switch]$Force
     )
     _assert_git_repo
@@ -384,42 +427,114 @@ function git_branch_delete_local {
 
 <#
 .SYNOPSIS
-Invoke git_branch_delete_remote.
+Delete a remote branch on origin.
 .DESCRIPTION
-Helper/command function for git_branch_delete_remote.
+Runs git push origin --delete to remove a branch from the remote.
+Requires -Force or interactive confirmation.
+.PARAMETER Branch
+Remote branch name to delete.
+.PARAMETER Force
+Skip interactive confirmation.
 .EXAMPLE
-dm git_branch_delete_remote
+git_branch_delete_remote -Branch old-feature -Force
 #>
 function git_branch_delete_remote {
-    param([Parameter(Mandatory=$true)][string]$Branch)
+    param(
+        [Parameter(Mandatory = $true)][string]$Branch,
+        [switch]$Force
+    )
     _assert_git_repo
+
+    if (-not $Force) {
+        if (-not (_confirm_action -Prompt "Delete remote branch '$Branch'?")) {
+            return
+        }
+    }
+
     git push origin --delete "$Branch"
+}
+
+# -----------------------------------------------------------------------------
+# Tags
+# -----------------------------------------------------------------------------
+
+<#
+.SYNOPSIS
+Create an annotated tag.
+.DESCRIPTION
+Creates a new annotated tag with a message at the current HEAD.
+.PARAMETER Name
+Tag name (e.g. v1.0.0).
+.PARAMETER Message
+Tag annotation message.
+.EXAMPLE
+git_tag_create -Name v1.0.0 -Message "Release 1.0.0"
+#>
+function git_tag_create {
+    param(
+        [Parameter(Mandatory = $true)][string]$Name,
+        [Parameter(Mandatory = $true)][string]$Message
+    )
+    _assert_git_repo
+    git tag -a "$Name" -m "$Message"
 }
 
 <#
 .SYNOPSIS
-Invoke git_rebase_continue.
+Push a single tag to remote.
 .DESCRIPTION
-Helper/command function for git_rebase_continue.
+Pushes the specified tag to origin.
+.PARAMETER Name
+Tag name to push.
 .EXAMPLE
-dm git_rebase_continue
+git_tag_push -Name v1.0.0
+#>
+function git_tag_push {
+    param([Parameter(Mandatory = $true)][string]$Name)
+    _assert_git_repo
+    git push origin "$Name"
+}
+
+<#
+.SYNOPSIS
+Push all local tags to remote.
+.DESCRIPTION
+Runs git push --tags to sync every local tag.
+.EXAMPLE
+git_tag_push_all
+#>
+function git_tag_push_all { _assert_git_repo; git push --tags }
+
+# -----------------------------------------------------------------------------
+# Rebase / Merge
+# -----------------------------------------------------------------------------
+
+<#
+.SYNOPSIS
+Continue an in-progress rebase.
+.DESCRIPTION
+Runs git rebase --continue after resolving conflicts.
+.EXAMPLE
+git_rebase_continue
 #>
 function git_rebase_continue { _assert_git_repo; git rebase --continue }
+
 <#
 .SYNOPSIS
-Invoke git_rebase_abort.
+Abort an in-progress rebase.
 .DESCRIPTION
-Helper/command function for git_rebase_abort.
+Cancels the current rebase and restores the previous state.
 .EXAMPLE
-dm git_rebase_abort
+git_rebase_abort
 #>
 function git_rebase_abort { _assert_git_repo; git rebase --abort }
+
 <#
 .SYNOPSIS
-Invoke git_merge_abort.
+Abort an in-progress merge.
 .DESCRIPTION
-Helper/command function for git_merge_abort.
+Cancels the current merge and restores the previous state.
 .EXAMPLE
-dm git_merge_abort
+git_merge_abort
 #>
 function git_merge_abort { _assert_git_repo; git merge --abort }

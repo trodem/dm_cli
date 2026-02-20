@@ -1,8 +1,9 @@
 # =============================================================================
-# STIBS DB TOOLKIT – Analytical & Intelligence queries
-# Functions to inspect MariaDB STIBS database and answer structural questions
-# Requires docker-compose mariadb service already configured
-# Entry point: dm stibs_db_*
+# STIBS DB TOOLKIT – Analytical & intelligence queries (standalone)
+# Inspect the MariaDB STIBS database: structure, data, relationships.
+# Requires docker and a running MariaDB container.
+# Safety: Read-only defaults. Import requires -Force or confirmation.
+# Entry point: stibs_db_*
 #
 # FUNCTIONS
 #   stibs_db_status
@@ -13,26 +14,19 @@
 #   stibs_db_shell
 #   stibs_db_export_dump
 #   stibs_db_import_dump
-#   stibs_db_tables
-#   stibs_db_mysql_query
-#   stibs_db_mysql_tables
-#   stibs_db_mysql_dump
 #   stibs_db_container
 #   stibs_db_env
+#   stibs_db_tables
 #   stibs_db_biggest_table
 #   stibs_db_top_tables
 #   stibs_db_total_records
 #   stibs_db_empty_tables
 #   stibs_db_biggest_size
 #   stibs_db_find_column
-#
-# INTELLIGENCE
 #   stibs_db_fk
 #   stibs_db_indexes
-#   stibs_db_search
 #   stibs_db_explain
 #   stibs_db_sample
-#   stibs_db_cardinality
 #   stibs_db_orphans
 #   stibs_db_doctor
 # =============================================================================
@@ -40,29 +34,107 @@
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
+# -----------------------------------------------------------------------------
+# Internal helpers — guards and config
+# -----------------------------------------------------------------------------
+
 <#
 .SYNOPSIS
-Invoke _stibs_db_get_config.
-.DESCRIPTION
-Helper/command function for _stibs_db_get_config.
+Ensure a command is available in PATH.
+.PARAMETER Name
+Command name to validate.
 .EXAMPLE
-dm _stibs_db_get_config
+_assert_command_available -Name docker
 #>
-function _stibs_db_get_config {
-    $cfg = _stibs_db_config
-    if ($null -eq $cfg) {
-        throw "STIBS DB config is not available."
+function _assert_command_available {
+    param([Parameter(Mandatory = $true)][string]$Name)
+    if (-not (Get-Command -Name $Name -ErrorAction SilentlyContinue)) {
+        throw "Required command '$Name' was not found in PATH."
     }
-    return $cfg
 }
 
 <#
 .SYNOPSIS
-Invoke _stibs_db_assert_identifier.
-.DESCRIPTION
-Helper/command function for _stibs_db_assert_identifier.
+Ensure a filesystem path exists.
+.PARAMETER Path
+Path to validate.
 .EXAMPLE
-dm _stibs_db_assert_identifier
+_assert_path_exists -Path "C:\Data"
+#>
+function _assert_path_exists {
+    param([Parameter(Mandatory = $true)][string]$Path)
+    if (-not (Test-Path -LiteralPath $Path)) {
+        throw "Required path '$Path' does not exist."
+    }
+}
+
+<#
+.SYNOPSIS
+Ask for yes/no confirmation before a risky action.
+.PARAMETER Prompt
+Message shown to the user.
+.EXAMPLE
+if (-not (_confirm_action -Prompt "Continue?")) { return }
+#>
+function _confirm_action {
+    param([Parameter(Mandatory = $true)][string]$Prompt)
+    $answer = Read-Host "$Prompt [y/N]"
+    if ([string]::IsNullOrWhiteSpace($answer)) { return $false }
+    return $answer.Trim().ToLowerInvariant() -in @("y", "yes")
+}
+
+<#
+.SYNOPSIS
+Read an environment variable with a fallback default.
+.PARAMETER Name
+Environment variable name.
+.PARAMETER Default
+Value to return if the variable is unset or empty.
+.EXAMPLE
+_env_or_default -Name "DM_STIBS_DB_USER" -Default "stibs"
+#>
+function _env_or_default {
+    param(
+        [Parameter(Mandatory = $true)][string]$Name,
+        [Parameter(Mandatory = $true)][string]$Default
+    )
+    $value = [Environment]::GetEnvironmentVariable($Name)
+    if ([string]::IsNullOrWhiteSpace($value)) { return $Default }
+    return $value
+}
+
+<#
+.SYNOPSIS
+Load STIBS database connection config.
+.DESCRIPTION
+Builds the config from environment variables with sensible defaults.
+.EXAMPLE
+_stibs_db_get_config
+#>
+function _stibs_db_get_config {
+    return [pscustomobject]@{
+        Container = _env_or_default -Name "DM_STIBS_DB_CONTAINER" -Default "docker-mariadb-1"
+        User      = _env_or_default -Name "DM_STIBS_DB_USER"      -Default "stibs"
+        Password  = _env_or_default -Name "DM_STIBS_DB_PASSWORD"  -Default "stibs"
+        Database  = _env_or_default -Name "DM_STIBS_DB_NAME"      -Default "stibs"
+    }
+}
+
+# -----------------------------------------------------------------------------
+# Internal helpers — SQL safety
+# -----------------------------------------------------------------------------
+
+<#
+.SYNOPSIS
+Validate a SQL identifier against injection.
+.DESCRIPTION
+Throws if the value does not match the safe identifier pattern [A-Za-z_][A-Za-z0-9_]*.
+.PARAMETER Value
+Identifier string to validate.
+.PARAMETER Name
+Label for the error message (default: "identifier").
+.EXAMPLE
+_stibs_db_assert_identifier -Value "users" -Name "table"
 #>
 function _stibs_db_assert_identifier {
     param(
@@ -80,11 +152,13 @@ function _stibs_db_assert_identifier {
 
 <#
 .SYNOPSIS
-Invoke _stibs_db_escape_sql_literal.
+Escape a string for use inside SQL single quotes.
 .DESCRIPTION
-Helper/command function for _stibs_db_escape_sql_literal.
+Doubles single-quote characters to prevent SQL injection.
+.PARAMETER Value
+String to escape.
 .EXAMPLE
-dm _stibs_db_escape_sql_literal
+_stibs_db_escape_sql_literal -Value "O'Brien"
 #>
 function _stibs_db_escape_sql_literal {
     param([Parameter(Mandatory = $true)][string]$Value)
@@ -93,11 +167,13 @@ function _stibs_db_escape_sql_literal {
 
 <#
 .SYNOPSIS
-Invoke _stibs_db_escape_like.
+Escape a string for use in a SQL LIKE clause.
 .DESCRIPTION
-Helper/command function for _stibs_db_escape_like.
+Escapes backslash, percent and underscore characters, then doubles single quotes.
+.PARAMETER Value
+String to escape.
 .EXAMPLE
-dm _stibs_db_escape_like
+_stibs_db_escape_like -Value "user_name"
 #>
 function _stibs_db_escape_like {
     param([Parameter(Mandatory = $true)][string]$Value)
@@ -107,11 +183,15 @@ function _stibs_db_escape_like {
 
 <#
 .SYNOPSIS
-Invoke _stibs_db_assert_limit.
+Validate and clamp a LIMIT value for SQL queries.
 .DESCRIPTION
-Helper/command function for _stibs_db_assert_limit.
+Returns the default if value is zero or negative; throws if above 1000.
+.PARAMETER Value
+Requested limit.
+.PARAMETER Default
+Fallback value when Value is non-positive (default: 5).
 .EXAMPLE
-dm _stibs_db_assert_limit
+_stibs_db_assert_limit -Value 20 -Default 5
 #>
 function _stibs_db_assert_limit {
     param(
@@ -130,13 +210,17 @@ function _stibs_db_assert_limit {
     return $Value
 }
 
-# ------------------------------------------------------------
-# CORE
-# ------------------------------------------------------------
+# -----------------------------------------------------------------------------
+# Core
+# -----------------------------------------------------------------------------
 
 <#
 .SYNOPSIS
-Verifica se il container MariaDB è attivo.
+Check if the MariaDB container is running.
+.DESCRIPTION
+Lists Docker containers matching the configured STIBS DB container name.
+.EXAMPLE
+stibs_db_status
 #>
 function stibs_db_status {
     _assert_command_available -Name docker
@@ -146,13 +230,17 @@ function stibs_db_status {
 
 <#
 .SYNOPSIS
-Esegue una query MariaDB nel container Docker.
+Execute a SQL query in the STIBS MariaDB container.
+.DESCRIPTION
+Runs the given SQL statement via docker exec against the configured database.
 .PARAMETER Sql
-Query SQL da eseguire.
+SQL statement to execute.
+.EXAMPLE
+stibs_db_query -Sql "SELECT COUNT(*) FROM users;"
 #>
 function stibs_db_query {
     param(
-        [Parameter(Mandatory)]
+        [Parameter(Mandatory = $true)]
         [string]$Sql
     )
 
@@ -167,43 +255,55 @@ function stibs_db_query {
 
 <#
 .SYNOPSIS
-Mostra database MariaDB.
+List all databases in the MariaDB instance.
+.EXAMPLE
+stibs_db_databases
 #>
 function stibs_db_databases {
-    stibs_db_query "SHOW DATABASES;"
+    stibs_db_query -Sql "SHOW DATABASES;"
 }
 
 <#
 .SYNOPSIS
-Mostra schema tabella.
+Show column schema of a table.
+.PARAMETER Table
+Table name to describe.
+.EXAMPLE
+stibs_db_schema -Table users
 #>
 function stibs_db_schema {
     param(
-        [Parameter(Mandatory)]
+        [Parameter(Mandatory = $true)]
         [string]$Table
     )
 
     $safeTable = _stibs_db_assert_identifier -Value $Table -Name "table"
-    stibs_db_query "DESCRIBE $safeTable;"
+    stibs_db_query -Sql "DESCRIBE $safeTable;"
 }
 
 <#
 .SYNOPSIS
-Conta righe di una tabella.
+Count rows in a table.
+.PARAMETER Table
+Table name.
+.EXAMPLE
+stibs_db_count -Table users
 #>
 function stibs_db_count {
     param(
-        [Parameter(Mandatory)]
+        [Parameter(Mandatory = $true)]
         [string]$Table
     )
 
     $safeTable = _stibs_db_assert_identifier -Value $Table -Name "table"
-    stibs_db_query "SELECT COUNT(*) AS total FROM $safeTable;"
+    stibs_db_query -Sql "SELECT COUNT(*) AS total FROM $safeTable;"
 }
 
 <#
 .SYNOPSIS
-Apre shell MariaDB nel container.
+Open interactive MariaDB shell in the container.
+.EXAMPLE
+stibs_db_shell
 #>
 function stibs_db_shell {
     _assert_command_available -Name docker
@@ -212,13 +312,19 @@ function stibs_db_shell {
         mysql -u$($cfg.User) -p$($cfg.Password) $($cfg.Database)
 }
 
-# ------------------------------------------------------------
-# EXPORT / IMPORT
-# ------------------------------------------------------------
+# -----------------------------------------------------------------------------
+# Export / Import
+# -----------------------------------------------------------------------------
 
 <#
 .SYNOPSIS
-Esporta il database MariaDB in un file .zip.
+Export the STIBS database as a zipped SQL dump.
+.PARAMETER Output
+Output directory or .zip file path (default: ~/Downloads).
+.EXAMPLE
+stibs_db_export_dump
+.EXAMPLE
+stibs_db_export_dump -Output "C:\backups\stibs.zip"
 #>
 function stibs_db_export_dump {
     param(
@@ -261,37 +367,40 @@ function stibs_db_export_dump {
     Compress-Archive -Path $sqlFile -DestinationPath $zipFile -Force
     Remove-Item $sqlFile -Force
 
-    Write-Output "Dump creato in: $zipFile"
+    return [pscustomobject]@{
+        Path      = $zipFile
+        Timestamp = $timestamp
+    }
 }
 
 <#
 .SYNOPSIS
-Ripristina il database MariaDB da un dump .zip.
+Restore the STIBS database from a zipped SQL dump.
+.DESCRIPTION
+Drops and recreates the database, then imports the SQL file from the zip.
+Requires -Force or interactive confirmation.
 .PARAMETER ZipFile
-Percorso del file zip contenente il dump SQL.
+Path to the zip file containing the SQL dump.
 .PARAMETER Force
-Salta la conferma interattiva prima del drop/recreate database.
+Skip interactive confirmation before drop/recreate.
 .EXAMPLE
-dm stibs_db_import_dump C:\Users\me\Downloads\stibs-20260218-101010.zip
+stibs_db_import_dump -ZipFile "C:\backups\stibs-20260218-101010.zip"
 .EXAMPLE
-dm stibs_db_import_dump C:\Users\me\Downloads\stibs-20260218-101010.zip -Force
+stibs_db_import_dump -ZipFile "C:\backups\stibs-20260218-101010.zip" -Force
 #>
 function stibs_db_import_dump {
     param(
-        [Parameter(Mandatory)]
+        [Parameter(Mandatory = $true)]
         [string]$ZipFile,
         [switch]$Force
     )
 
     _assert_command_available -Name docker
-    if (-not (Test-Path -LiteralPath $ZipFile)) {
-        throw "File non trovato: $ZipFile"
-    }
+    _assert_path_exists -Path $ZipFile
 
     if (-not $Force) {
-        if (-not (_confirm_action -Prompt "This will drop and recreate database. Continue")) {
-            Write-Output "Operazione annullata."
-            return
+        if (-not (_confirm_action -Prompt "This will drop and recreate the database. Continue")) {
+            return [pscustomobject]@{ Status = "Cancelled" }
         }
     }
 
@@ -314,69 +423,18 @@ function stibs_db_import_dump {
 
     Remove-Item $tempDir -Recurse -Force
 
-    Write-Output "Restore completato con successo"
+    return [pscustomobject]@{ Status = "Restored"; Source = $ZipFile }
 }
 
-# ------------------------------------------------------------
-# GENERIC MYSQL WRAPPERS
-# ------------------------------------------------------------
+# -----------------------------------------------------------------------------
+# Discovery
+# -----------------------------------------------------------------------------
 
 <#
 .SYNOPSIS
-Esegue query MySQL generica.
-#>
-function stibs_db_mysql_query {
-    param(
-        [Parameter(Mandatory)][string]$Container,
-        [Parameter(Mandatory)][string]$User,
-        [Parameter(Mandatory)][string]$Password,
-        [Parameter(Mandatory)][string]$Database,
-        [Parameter(Mandatory)][string]$Query
-    )
-
-    _assert_command_available -Name docker
-    docker exec -i $Container mysql -u$User -p$Password $Database -e $Query
-}
-
-<#
-.SYNOPSIS
-Elenca tabelle MySQL generiche.
-#>
-function stibs_db_mysql_tables {
-    param(
-        [Parameter(Mandatory)][string]$Container,
-        [Parameter(Mandatory)][string]$User,
-        [Parameter(Mandatory)][string]$Password,
-        [Parameter(Mandatory)][string]$Database
-    )
-
-    stibs_db_mysql_query $Container $User $Password $Database "SHOW TABLES;"
-}
-
-<#
-.SYNOPSIS
-Dump MySQL generico.
-#>
-function stibs_db_mysql_dump {
-    param(
-        [Parameter(Mandatory)][string]$Container,
-        [Parameter(Mandatory)][string]$User,
-        [Parameter(Mandatory)][string]$Password,
-        [Parameter(Mandatory)][string]$Database,
-        [Parameter(Mandatory)][string]$Output
-    )
-
-    _assert_command_available -Name docker
-    docker exec $Container mysqldump -u$User -p$Password $Database > $Output
-}
-
-# ------------------------------------------------------------
-# DISCOVERY
-# ------------------------------------------------------------
-
-<#
-.SYNOPSIS
-Restituisce container MariaDB.
+Return the STIBS MariaDB container ID.
+.EXAMPLE
+stibs_db_container
 #>
 function stibs_db_container {
     _assert_command_available -Name docker
@@ -385,7 +443,9 @@ function stibs_db_container {
 
 <#
 .SYNOPSIS
-Recupera variabili ambiente MariaDB.
+Show environment variables of the MariaDB container.
+.EXAMPLE
+stibs_db_env
 #>
 function stibs_db_env {
     _assert_command_available -Name docker
@@ -396,21 +456,25 @@ function stibs_db_env {
         Select-Object -ExpandProperty Env
 }
 
-# ------------------------------------------------------------
-# ANALYTICS
-# ------------------------------------------------------------
-
 <#
 .SYNOPSIS
-Elenca tabelle database.
+List all tables in the STIBS database.
+.EXAMPLE
+stibs_db_tables
 #>
 function stibs_db_tables {
-    stibs_db_query "SHOW TABLES;"
+    stibs_db_query -Sql "SHOW TABLES;"
 }
+
+# -----------------------------------------------------------------------------
+# Analytics
+# -----------------------------------------------------------------------------
 
 <#
 .SYNOPSIS
-Tabella con più record.
+Show the table with the most rows.
+.EXAMPLE
+stibs_db_biggest_table
 #>
 function stibs_db_biggest_table {
     $cfg = _stibs_db_get_config
@@ -424,12 +488,18 @@ ORDER BY table_rows DESC
 LIMIT 1;
 "@
 
-    stibs_db_query $sql
+    stibs_db_query -Sql $sql
 }
 
 <#
 .SYNOPSIS
-Top tabelle per numero record.
+Show top tables ranked by row count.
+.PARAMETER Limit
+Number of tables to show (default 5, max 1000).
+.EXAMPLE
+stibs_db_top_tables
+.EXAMPLE
+stibs_db_top_tables -Limit 10
 #>
 function stibs_db_top_tables {
     param([int]$Limit = 5)
@@ -445,12 +515,14 @@ ORDER BY table_rows DESC
 LIMIT $safeLimit;
 "@
 
-    stibs_db_query $sql
+    stibs_db_query -Sql $sql
 }
 
 <#
 .SYNOPSIS
-Numero totale record database.
+Show total record count across all tables.
+.EXAMPLE
+stibs_db_total_records
 #>
 function stibs_db_total_records {
     $cfg = _stibs_db_get_config
@@ -462,12 +534,14 @@ FROM information_schema.tables
 WHERE table_schema = '$dbNameLiteral';
 "@
 
-    stibs_db_query $sql
+    stibs_db_query -Sql $sql
 }
 
 <#
 .SYNOPSIS
-Tabelle vuote.
+List tables with zero rows.
+.EXAMPLE
+stibs_db_empty_tables
 #>
 function stibs_db_empty_tables {
     $cfg = _stibs_db_get_config
@@ -480,12 +554,18 @@ WHERE table_schema = '$dbNameLiteral'
 AND table_rows = 0;
 "@
 
-    stibs_db_query $sql
+    stibs_db_query -Sql $sql
 }
 
 <#
 .SYNOPSIS
-Tabelle più grandi per dimensione.
+Show largest tables by disk size in MB.
+.PARAMETER Limit
+Number of tables to show (default 5, max 1000).
+.EXAMPLE
+stibs_db_biggest_size
+.EXAMPLE
+stibs_db_biggest_size -Limit 10
 #>
 function stibs_db_biggest_size {
     param([int]$Limit = 5)
@@ -494,7 +574,7 @@ function stibs_db_biggest_size {
     $dbNameLiteral = _stibs_db_escape_sql_literal -Value $cfg.Database
 
     $sql = @"
-SELECT 
+SELECT
     table_name,
     ROUND((data_length + index_length) / 1024 / 1024, 2) AS size_mb
 FROM information_schema.tables
@@ -503,15 +583,23 @@ ORDER BY size_mb DESC
 LIMIT $safeLimit;
 "@
 
-    stibs_db_query $sql
+    stibs_db_query -Sql $sql
 }
 
 <#
 .SYNOPSIS
-Trova colonne nel database.
+Find columns by name pattern across all tables.
+.PARAMETER Column
+Column name substring to search for.
+.EXAMPLE
+stibs_db_find_column -Column "email"
 #>
 function stibs_db_find_column {
-    param([Parameter(Mandatory)][string]$Column)
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Column
+    )
+
     $cfg = _stibs_db_get_config
     $dbNameLiteral = _stibs_db_escape_sql_literal -Value $cfg.Database
     $columnLike = _stibs_db_escape_like -Value $Column
@@ -523,24 +611,34 @@ WHERE table_schema = '$dbNameLiteral'
 AND column_name LIKE '%$columnLike%' ESCAPE '\\';
 "@
 
-    stibs_db_query $sql
+    stibs_db_query -Sql $sql
 }
 
-# ------------------------------------------------------------
-# INTELLIGENCE
-# ------------------------------------------------------------
+# -----------------------------------------------------------------------------
+# Intelligence
+# -----------------------------------------------------------------------------
 
 <#
 .SYNOPSIS
-Foreign key relations per tabella.
+Show foreign key relationships for a table.
+.DESCRIPTION
+Returns all foreign keys where the table is either the source or the referenced table.
+.PARAMETER Table
+Table name to inspect.
+.EXAMPLE
+stibs_db_fk -Table users
 #>
 function stibs_db_fk {
-    param([Parameter(Mandatory)][string]$Table)
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Table
+    )
+
     $cfg = _stibs_db_get_config
     $dbNameLiteral = _stibs_db_escape_sql_literal -Value $cfg.Database
     $tableLiteral = _stibs_db_escape_sql_literal -Value $Table
 
-    stibs_db_query @"
+    stibs_db_query -Sql @"
 SELECT table_name, column_name, referenced_table_name, referenced_column_name
 FROM information_schema.key_column_usage
 WHERE table_schema = '$dbNameLiteral'
@@ -550,56 +648,92 @@ AND (table_name = '$tableLiteral' OR referenced_table_name = '$tableLiteral');
 
 <#
 .SYNOPSIS
-Mostra indici tabella.
+Show indexes defined on a table.
+.PARAMETER Table
+Table name to inspect.
+.EXAMPLE
+stibs_db_indexes -Table users
 #>
 function stibs_db_indexes {
-    param([Parameter(Mandatory)][string]$Table)
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Table
+    )
+
     $safeTable = _stibs_db_assert_identifier -Value $Table -Name "table"
-    stibs_db_query "SHOW INDEX FROM $safeTable;"
+    stibs_db_query -Sql "SHOW INDEX FROM $safeTable;"
 }
 
 <#
 .SYNOPSIS
-Explain query.
+Run EXPLAIN on a SQL query to show execution plan.
+.PARAMETER Query
+SQL query to explain (without the EXPLAIN keyword).
+.EXAMPLE
+stibs_db_explain -Query "SELECT * FROM users WHERE id = 1"
 #>
 function stibs_db_explain {
-    param([Parameter(Mandatory)][string]$Query)
-    stibs_db_query "EXPLAIN $Query;"
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Query
+    )
+
+    stibs_db_query -Sql "EXPLAIN $Query;"
 }
 
 <#
 .SYNOPSIS
-Sample dati tabella.
+Return a sample of rows from a table.
+.PARAMETER Table
+Table name to sample.
+.PARAMETER Limit
+Number of rows to return (default 10, max 1000).
+.EXAMPLE
+stibs_db_sample -Table users
+.EXAMPLE
+stibs_db_sample -Table users -Limit 3
 #>
 function stibs_db_sample {
     param(
-        [Parameter(Mandatory)][string]$Table,
+        [Parameter(Mandatory = $true)]
+        [string]$Table,
         [int]$Limit = 10
     )
+
     $safeTable = _stibs_db_assert_identifier -Value $Table -Name "table"
     $safeLimit = _stibs_db_assert_limit -Value $Limit -Default 10
-    stibs_db_query "SELECT * FROM $safeTable LIMIT $safeLimit;"
+    stibs_db_query -Sql "SELECT * FROM $safeTable LIMIT $safeLimit;"
 }
 
 <#
 .SYNOPSIS
-Trova record orfani.
+Find orphan rows where the foreign key references a missing parent.
+.PARAMETER ChildTable
+Table containing the foreign key column.
+.PARAMETER ChildColumn
+Foreign key column in the child table.
+.PARAMETER ParentTable
+Referenced parent table.
+.PARAMETER ParentColumn
+Referenced column in the parent table.
+.EXAMPLE
+stibs_db_orphans -ChildTable orders -ChildColumn user_id -ParentTable users -ParentColumn id
 #>
 function stibs_db_orphans {
     param(
-        [Parameter(Mandatory)][string]$ChildTable,
-        [Parameter(Mandatory)][string]$ChildColumn,
-        [Parameter(Mandatory)][string]$ParentTable,
-        [Parameter(Mandatory)][string]$ParentColumn
+        [Parameter(Mandatory = $true)][string]$ChildTable,
+        [Parameter(Mandatory = $true)][string]$ChildColumn,
+        [Parameter(Mandatory = $true)][string]$ParentTable,
+        [Parameter(Mandatory = $true)][string]$ParentColumn
     )
 
-    $safeChildTable = _stibs_db_assert_identifier -Value $ChildTable -Name "child table"
+    $safeChildTable  = _stibs_db_assert_identifier -Value $ChildTable  -Name "child table"
     $safeChildColumn = _stibs_db_assert_identifier -Value $ChildColumn -Name "child column"
     $safeParentTable = _stibs_db_assert_identifier -Value $ParentTable -Name "parent table"
     $safeParentColumn = _stibs_db_assert_identifier -Value $ParentColumn -Name "parent column"
 
-    stibs_db_query @"
-SELECT *
+    stibs_db_query -Sql @"
+SELECT c.*
 FROM $safeChildTable c
 LEFT JOIN $safeParentTable p
 ON c.$safeChildColumn = p.$safeParentColumn
@@ -609,19 +743,23 @@ WHERE p.$safeParentColumn IS NULL;
 
 <#
 .SYNOPSIS
-Diagnostica database.
+Run a quick health check on the STIBS database.
+.DESCRIPTION
+Verifies connectivity, counts tables, reports empty tables and largest tables by size.
+.EXAMPLE
+stibs_db_doctor
 #>
 function stibs_db_doctor {
 
-    Write-Host "Checking DB connection..."
-    stibs_db_query "SELECT 1;"
+    $connection = stibs_db_query -Sql "SELECT 1;"
+    $tables     = stibs_db_tables
+    $empty      = stibs_db_empty_tables
+    $largest    = stibs_db_biggest_size
 
-    Write-Host "Tables:"
-    stibs_db_tables
-
-    Write-Host "Empty tables:"
-    stibs_db_empty_tables
-
-    Write-Host "Largest tables:"
-    stibs_db_biggest_size
+    return [pscustomobject]@{
+        ConnectionOk  = ($null -ne $connection)
+        Tables        = $tables
+        EmptyTables   = $empty
+        LargestBySize = $largest
+    }
 }
