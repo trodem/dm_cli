@@ -103,7 +103,7 @@ func runPlugin(baseDir string, args []string) int {
 			return 1
 		}
 		if len(items) == 0 {
-			fmt.Println("No plugins/functions found.")
+			fmt.Println("No plugins found.")
 			return 0
 		}
 		for _, item := range items {

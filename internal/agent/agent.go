@@ -204,7 +204,7 @@ func DecideWithPlugins(userPrompt string, pluginCatalog string, toolCatalog stri
 	decisionPrompt := strings.Join([]string{
 		"You are an execution planner for a CLI assistant.",
 		"You can either answer directly, or request running one plugin/function, or request running one tool.",
-		"Available plugins/functions:",
+		"Available plugins:",
 		pluginCatalog,
 		"",
 		"Available tools:",

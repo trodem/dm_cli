@@ -157,7 +157,7 @@ func checkPlugins(baseDir string) Check {
 		return Check{
 			Level:   LevelWarn,
 			Name:    "plugins",
-			Message: "no plugins/functions found",
+			Message: "no plugins found",
 		}
 	}
 	return Check{

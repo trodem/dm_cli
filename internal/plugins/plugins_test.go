@@ -79,7 +79,7 @@ func TestCollectPowerShellFunctionsFromMultipleFiles(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dir, "b_profile.txt"), []byte("function two { }\nfunction shared { }\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	sub := filepath.Join(dir, "functions")
+	sub := filepath.Join(dir, "sub")
 	if err := os.MkdirAll(sub, 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -229,14 +229,13 @@ func TestGetInfoCacheInvalidatesOnSourceChange(t *testing.T) {
 func TestListFunctionFiles(t *testing.T) {
 	baseDir := t.TempDir()
 	pluginsDir := filepath.Join(baseDir, "plugins")
-	subDir := filepath.Join(pluginsDir, "functions")
-	if err := os.MkdirAll(subDir, 0o755); err != nil {
+	if err := os.MkdirAll(pluginsDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(filepath.Join(pluginsDir, "vars.ps1"), []byte("function _helper { }\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(subDir, "git.ps1"), []byte("function g_status { }\nfunction g_log { }\n"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(pluginsDir, "git.ps1"), []byte("function g_status { }\nfunction g_log { }\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 

@@ -17,7 +17,8 @@ Repository guidelines for automated agents.
   - `dm.json` (optional root includes)
   - `config/*.json` (optional included fragments)
 - Plugin files:
-  - `plugins/functions/*.ps1` (standalone toolkit files with public command functions)
+  - `plugins/*.ps1` (standalone toolkit files with public command functions)
+  - Domain-scoped toolkits go in subfolders (e.g. `plugins/STIBS/`, `plugins/M365/`)
 
 ## Code Style
 - Keep ASCII-only in source files unless necessary.
@@ -65,7 +66,7 @@ Repository guidelines for automated agents.
   - `dm plugins run <name> [args...]`
 
 ## PowerShell Plugin Conventions
-- Store public PowerShell plugin commands in `plugins/functions/*.ps1`.
+- Store public PowerShell plugin commands in `plugins/*.ps1`.
 - Each toolkit file must be fully standalone — all helpers, guards, and config defined internally.
 - Use `Set-StrictMode -Version Latest` and `$ErrorActionPreference = "Stop"` in plugin `.ps1` files.
 - Public plugin function names must be explicit and domain-prefixed (for example `sys_*`, `git_*`, `stibs_db_*`).
@@ -83,7 +84,7 @@ Repository guidelines for automated agents.
   - `go run ./scripts/check_plugin_help.go`
 
 ## Toolkit Construction Rules
-Toolkits are domain-specific PowerShell `.ps1` files under `plugins/functions/`.
+Toolkits are domain-specific PowerShell `.ps1` files under `plugins/`.
 Each toolkit groups related functions behind a shared prefix.
 
 ### File Layout
@@ -105,7 +106,7 @@ Every toolkit file MUST follow this top-to-bottom structure:
 ### Naming
 - **File name**: `<Name>_Toolkit.ps1` (PascalCase name, underscore, `Toolkit`).
   Use a numeric prefix for ordering when needed (e.g. `3_System_Toolkit.ps1`).
-  Domain-scoped toolkits go in subfolders (e.g. `STIBS/`, `M365/`).
+  Domain-scoped toolkits go in subfolders (e.g. `plugins/STIBS/`, `plugins/M365/`).
 - **Public functions**: `<prefix>_<action>` all lowercase (e.g. `sys_uptime`, `git_status`, `browser_open`).
   The prefix must be short, unique across all toolkits, and domain-descriptive.
 - **Private helpers**: start with `_` (e.g. `_assert_git_repo`, `_dc`, `_wifi_profiles`).
@@ -181,16 +182,16 @@ Active prefixes — do not reuse these when creating new toolkits:
 
 | Prefix | Toolkit | Path |
 |---|---|---|
-| `sys_*` | System Toolkit | `3_System_Toolkit.ps1` |
-| `git_*` | Git Toolkit | `4_Git_Toolkit.ps1` |
-| `fs_path_*` | FileSystem Path Toolkit | `2_FileSystem_Toolkit.ps1` |
-| `browser_*` | Browser Toolkit | `Browser_Toolkit.ps1` |
-| `start_*` | Start Dev Toolkit | `Start_Dev_Toolkit.ps1` |
-| `help_*` | Help Toolkit | `Help_Toolkit.ps1` |
-| `stibs_db_*` | STIBS DB Toolkit | `STIBS/STIBS_DB_Toolkit.ps1` |
-| `stibs_docker_*` | STIBS Docker Toolkit | `STIBS/STIBS_Docker_Toolkit.ps1` |
-| `kvpstar_*` | KVP Star Site Toolkit | `M365/KVP_Star_Site_Toolkit.ps1` |
-| `star_ibs_*` | Star IBS Applications Toolkit | `M365/Star_IBS_Applications_Toolkit.ps1` |
+| `sys_*` | System Toolkit | `plugins/3_System_Toolkit.ps1` |
+| `git_*` | Git Toolkit | `plugins/4_Git_Toolkit.ps1` |
+| `fs_path_*` | FileSystem Path Toolkit | `plugins/2_FileSystem_Toolkit.ps1` |
+| `browser_*` | Browser Toolkit | `plugins/Browser_Toolkit.ps1` |
+| `start_*` | Start Dev Toolkit | `plugins/Start_Dev_Toolkit.ps1` |
+| `help_*` | Help Toolkit | `plugins/Help_Toolkit.ps1` |
+| `stibs_db_*` | STIBS DB Toolkit | `plugins/STIBS/STIBS_DB_Toolkit.ps1` |
+| `stibs_docker_*` | STIBS Docker Toolkit | `plugins/STIBS/STIBS_Docker_Toolkit.ps1` |
+| `kvpstar_*` | KVP Star Site Toolkit | `plugins/M365/KVP_Star_Site_Toolkit.ps1` |
+| `star_ibs_*` | Star IBS Applications Toolkit | `plugins/M365/Star_IBS_Applications_Toolkit.ps1` |
 
 Update this table when adding or removing toolkits.
 
