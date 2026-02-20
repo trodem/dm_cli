@@ -139,8 +139,7 @@ func TestInstallCompletionUnsupportedShell(t *testing.T) {
 
 func TestAddCobraSubcommandsIncludesDoctor(t *testing.T) {
 	root := &cobra.Command{Use: "dm"}
-	opts := &flags{}
-	addCobraSubcommands(root, opts)
+	addCobraSubcommands(root)
 
 	cmd, _, err := root.Find([]string{"doctor"})
 	if err != nil {
@@ -153,8 +152,7 @@ func TestAddCobraSubcommandsIncludesDoctor(t *testing.T) {
 
 func TestAddCobraSubcommandsIncludesToolkit(t *testing.T) {
 	root := &cobra.Command{Use: "dm"}
-	opts := &flags{}
-	addCobraSubcommands(root, opts)
+	addCobraSubcommands(root)
 
 	cmd, _, err := root.Find([]string{"toolkit"})
 	if err != nil {

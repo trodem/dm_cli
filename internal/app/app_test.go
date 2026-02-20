@@ -6,7 +6,7 @@ import (
 )
 
 func TestParseFlagsToolsShortcut(t *testing.T) {
-	_, out := parseFlags([]string{"-t"})
+	out := parseFlags([]string{"-t"})
 	want := []string{"tools"}
 	if !reflect.DeepEqual(out, want) {
 		t.Fatalf("expected %v, got %v", want, out)
@@ -14,7 +14,7 @@ func TestParseFlagsToolsShortcut(t *testing.T) {
 }
 
 func TestParseFlagsToolsShortcutWithTarget(t *testing.T) {
-	_, out := parseFlags([]string{"-t", "search"})
+	out := parseFlags([]string{"-t", "search"})
 	want := []string{"tools", "search"}
 	if !reflect.DeepEqual(out, want) {
 		t.Fatalf("expected %v, got %v", want, out)
@@ -22,7 +22,7 @@ func TestParseFlagsToolsShortcutWithTarget(t *testing.T) {
 }
 
 func TestParseFlagsToolsShortcutWithUnrelatedFlags(t *testing.T) {
-	_, out := parseFlags([]string{"--verbose", "-t", "s"})
+	out := parseFlags([]string{"--verbose", "-t", "s"})
 	want := []string{"--verbose", "tools", "s"}
 	if !reflect.DeepEqual(out, want) {
 		t.Fatalf("expected %v, got %v", want, out)
@@ -30,7 +30,7 @@ func TestParseFlagsToolsShortcutWithUnrelatedFlags(t *testing.T) {
 }
 
 func TestParseFlagsPluginsShortcut(t *testing.T) {
-	_, out := parseFlags([]string{"-p", "list"})
+	out := parseFlags([]string{"-p", "list"})
 	want := []string{"plugins", "list"}
 	if !reflect.DeepEqual(out, want) {
 		t.Fatalf("expected %v, got %v", want, out)
@@ -38,7 +38,7 @@ func TestParseFlagsPluginsShortcut(t *testing.T) {
 }
 
 func TestParseFlagsOpenShortcut(t *testing.T) {
-	_, out := parseFlags([]string{"-o", "profile"})
+	out := parseFlags([]string{"-o", "profile"})
 	want := []string{"open", "profile"}
 	if !reflect.DeepEqual(out, want) {
 		t.Fatalf("expected %v, got %v", want, out)

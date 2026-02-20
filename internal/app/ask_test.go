@@ -164,3 +164,18 @@ func TestDecisionCacheStoreTTL(t *testing.T) {
 		t.Fatal("expected cache miss after ttl expiration")
 	}
 }
+
+func TestIsKnownTool(t *testing.T) {
+	known := []string{"search", "s", "rename", "r", "recent", "rec", "backup", "b", "clean", "c", "system", "sys", "htop"}
+	for _, name := range known {
+		if !isKnownTool(name) {
+			t.Fatalf("expected %q to be a known tool", name)
+		}
+	}
+	unknown := []string{"e", "y", "foo", "1", ""}
+	for _, name := range unknown {
+		if isKnownTool(name) {
+			t.Fatalf("expected %q to NOT be a known tool", name)
+		}
+	}
+}

@@ -66,7 +66,7 @@ func addCompletionCommands(root *cobra.Command) {
 			if err != nil {
 				return err
 			}
-			fmt.Println("OK: completion installata")
+			fmt.Println("OK: completion installed")
 			fmt.Println("Shell:", shellName)
 			fmt.Println("Script:", scriptPath)
 			if strings.TrimSpace(profilePath) != "" {
@@ -83,7 +83,7 @@ func addCompletionCommands(root *cobra.Command) {
 
 func installCompletion(root *cobra.Command, homeDir, shellName string) (string, string, error) {
 	if strings.TrimSpace(homeDir) == "" {
-		return "", "", fmt.Errorf("home directory non valida")
+		return "", "", fmt.Errorf("invalid home directory")
 	}
 	switch strings.ToLower(strings.TrimSpace(shellName)) {
 	case "powershell":
@@ -142,7 +142,7 @@ func installCompletion(root *cobra.Command, homeDir, shellName string) (string, 
 		}
 		return scriptPath, "", nil
 	default:
-		return "", "", fmt.Errorf("shell non supportata: %s", shellName)
+		return "", "", fmt.Errorf("unsupported shell: %s", shellName)
 	}
 }
 

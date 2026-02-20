@@ -13,8 +13,8 @@ import (
 )
 
 func runLegacy(args []string) int {
-	_, rest := parseFlags(args)
-	rt, err := loadRuntime(flags{})
+	rest := parseFlags(args)
+	rt, err := loadRuntime()
 	if err != nil {
 		fmt.Println("Error:", err)
 		return 1
@@ -177,8 +177,7 @@ type runtimeContext struct {
 	BaseDir string
 }
 
-func loadRuntime(opts flags) (runtimeContext, error) {
-	_ = opts
+func loadRuntime() (runtimeContext, error) {
 	baseDir, err := exeDir()
 	if err != nil {
 		return runtimeContext{}, fmt.Errorf("cannot determine executable directory: %w", err)
@@ -186,9 +185,7 @@ func loadRuntime(opts flags) (runtimeContext, error) {
 	return runtimeContext{BaseDir: baseDir}, nil
 }
 
-type flags struct{}
-
-func parseFlags(args []string) (flags, []string) {
+func parseFlags(args []string) []string {
 	out := make([]string, 0, len(args))
 	for i := 0; i < len(args); i++ {
 		arg := args[i]
@@ -202,7 +199,7 @@ func parseFlags(args []string) (flags, []string) {
 		}
 		out = append(out, arg)
 	}
-	return flags{}, out
+	return out
 }
 
 func runPlugin(baseDir string, args []string) int {

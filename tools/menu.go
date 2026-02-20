@@ -92,6 +92,10 @@ func RunByNameWithParamsDetailed(baseDir, name string, params map[string]string)
 		return RunRecentAutoDetailed(baseDir, params)
 	case "clean":
 		return AutoRunResult{Code: RunCleanEmptyAuto(baseDir, params)}
+	case "backup":
+		return AutoRunResult{Code: RunBackupAuto(baseDir, params)}
+	case "system":
+		return AutoRunResult{Code: RunSystemAuto()}
 	default:
 		return AutoRunResult{Code: RunByName(baseDir, name)}
 	}

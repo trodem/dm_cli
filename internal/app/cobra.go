@@ -17,8 +17,6 @@ func (e exitCodeError) Error() string {
 }
 
 func Run(args []string) int {
-	var opts flags
-
 	root := &cobra.Command{
 		Use:   "dm",
 		Short: "Personal CLI for tools, plugins, and AI helpers",
@@ -29,7 +27,7 @@ func Run(args []string) int {
 		SilenceErrors: true,
 		SilenceUsage:  true,
 		RunE: func(cmd *cobra.Command, positional []string) error {
-			code := runLegacy(legacyArgsWithFlags(opts, positional))
+			code := runLegacy(positional)
 			if code != 0 {
 				return exitCodeError{code: code}
 			}
@@ -42,8 +40,8 @@ func Run(args []string) int {
 	root.PersistentFlags().BoolP("open", "o", false, "shortcut for 'open' command")
 	root.CompletionOptions.DisableDefaultCmd = true
 
-	addCobraSubcommands(root, &opts)
-	addPluginAwareHelpCommand(root, &opts)
+	addCobraSubcommands(root)
+	addPluginAwareHelpCommand(root)
 	addCompletionCommands(root)
 	applySubcommandHelpTemplate(root)
 
@@ -56,9 +54,9 @@ func Run(args []string) int {
 		}
 		msg := strings.TrimSpace(err.Error())
 		if strings.HasPrefix(msg, "unknown help topic") {
-			_, rest := parseFlags(rewriteGroupShortcuts(args))
+			rest := parseFlags(rewriteGroupShortcuts(args))
 			if len(rest) >= 2 && rest[0] == "help" {
-				rt, loadErr := loadRuntime(opts)
+				rt, loadErr := loadRuntime()
 				if loadErr != nil {
 					fmt.Println("Error:", loadErr)
 					return 1
@@ -67,12 +65,12 @@ func Run(args []string) int {
 			}
 		}
 		if strings.HasPrefix(msg, "unknown command") {
-			rt, loadErr := loadRuntime(opts)
+			rt, loadErr := loadRuntime()
 			if loadErr != nil {
 				fmt.Println("Error:", loadErr)
 				return 1
 			}
-			_, rest := parseFlags(rewriteGroupShortcuts(args))
+			rest := parseFlags(rewriteGroupShortcuts(args))
 			if len(rest) > 0 && rest[0] == "$profile" {
 				return showPowerShellSymbols(resolveUserPowerShellProfilePath(), "$PROFILE")
 			}
@@ -89,12 +87,7 @@ func Run(args []string) int {
 	return 0
 }
 
-func legacyArgsWithFlags(opts flags, positional []string) []string {
-	_ = opts
-	return append([]string{}, positional...)
-}
-
-func addPluginAwareHelpCommand(root *cobra.Command, opts *flags) {
+func addPluginAwareHelpCommand(root *cobra.Command) {
 	helpCmd := &cobra.Command{
 		Use:   "help [command]",
 		Short: "Help about any command or plugin/function",
@@ -107,7 +100,7 @@ func addPluginAwareHelpCommand(root *cobra.Command, opts *flags) {
 			if err == nil && target != nil && target != root {
 				return target.Help()
 			}
-			rt, loadErr := loadRuntime(*opts)
+			rt, loadErr := loadRuntime()
 			if loadErr != nil {
 				return loadErr
 			}

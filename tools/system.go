@@ -10,6 +10,10 @@ import (
 	"cli/internal/ui"
 )
 
+func RunSystemAuto() int {
+	return RunSystem(nil)
+}
+
 func RunSystem(_ *bufio.Reader) int {
 	s := systeminfo.Collect()
 

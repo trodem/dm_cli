@@ -13,14 +13,14 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func newToolkitCommand(opts *flags) *cobra.Command {
+func newToolkitCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "toolkit",
 		Short: "Create and maintain plugin toolkits with a guided UX",
 		Long:  "Built-in toolkit generator for creating and evolving plugin toolkits.",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			rt, err := loadRuntime(*opts)
+			rt, err := loadRuntime()
 			if err != nil {
 				return err
 			}
@@ -40,7 +40,7 @@ func newToolkitCommand(opts *flags) *cobra.Command {
 		Short: "Create a new toolkit scaffold",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			rt, err := loadRuntime(*opts)
+			rt, err := loadRuntime()
 			if err != nil {
 				return err
 			}
@@ -71,7 +71,7 @@ func newToolkitCommand(opts *flags) *cobra.Command {
 		Short: "Add a function to an existing toolkit",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			rt, err := loadRuntime(*opts)
+			rt, err := loadRuntime()
 			if err != nil {
 				return err
 			}
@@ -106,7 +106,7 @@ func newToolkitCommand(opts *flags) *cobra.Command {
 		Short: "Validate toolkit files and functions",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			rt, err := loadRuntime(*opts)
+			rt, err := loadRuntime()
 			if err != nil {
 				return err
 			}

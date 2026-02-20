@@ -17,6 +17,12 @@ const (
 	defaultOllamaModel   = "deepseek-coder-v2:latest"
 	defaultOpenAIBaseURL = "https://api.openai.com/v1"
 	defaultOpenAIModel   = "gpt-4o-mini"
+	maxRetries           = 1
+)
+
+var (
+	retryDelay       = 2 * time.Second
+	sharedHTTPClient = &http.Client{Timeout: 60 * time.Second}
 )
 
 type userConfig struct {
@@ -392,6 +398,31 @@ func configPathNearExecutable() string {
 	return filepath.Join(filepath.Dir(exe), "dm.agent.json")
 }
 
+func doWithRetry(buildReq func() (*http.Request, error)) (*http.Response, error) {
+	var lastErr error
+	for attempt := 0; attempt <= maxRetries; attempt++ {
+		if attempt > 0 {
+			time.Sleep(retryDelay)
+		}
+		req, err := buildReq()
+		if err != nil {
+			return nil, err
+		}
+		res, err := sharedHTTPClient.Do(req)
+		if err != nil {
+			lastErr = err
+			continue
+		}
+		if res.StatusCode >= 500 {
+			_ = res.Body.Close()
+			lastErr = fmt.Errorf("server error: %s", res.Status)
+			continue
+		}
+		return res, nil
+	}
+	return nil, lastErr
+}
+
 func askOllama(prompt string, cfg ollamaConfig) (string, string, error) {
 	baseURL, model := normalizedOllamaValues(cfg)
 
@@ -404,13 +435,14 @@ func askOllama(prompt string, cfg ollamaConfig) (string, string, error) {
 	if err != nil {
 		return "", model, err
 	}
-	req, err := http.NewRequest(http.MethodPost, baseURL+"/api/generate", bytes.NewReader(raw))
-	if err != nil {
-		return "", model, err
-	}
-	req.Header.Set("Content-Type", "application/json")
-	client := &http.Client{Timeout: 45 * time.Second}
-	res, err := client.Do(req)
+	res, err := doWithRetry(func() (*http.Request, error) {
+		req, err := http.NewRequest(http.MethodPost, baseURL+"/api/generate", bytes.NewReader(raw))
+		if err != nil {
+			return nil, err
+		}
+		req.Header.Set("Content-Type", "application/json")
+		return req, nil
+	})
 	if err != nil {
 		return "", model, err
 	}
@@ -448,14 +480,15 @@ func askOpenAI(prompt string, cfg openAIConfig) (string, string, error) {
 	if err != nil {
 		return "", model, err
 	}
-	req, err := http.NewRequest(http.MethodPost, baseURL+"/chat/completions", bytes.NewReader(raw))
-	if err != nil {
-		return "", model, err
-	}
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+apiKey)
-	client := &http.Client{Timeout: 60 * time.Second}
-	res, err := client.Do(req)
+	res, err := doWithRetry(func() (*http.Request, error) {
+		req, err := http.NewRequest(http.MethodPost, baseURL+"/chat/completions", bytes.NewReader(raw))
+		if err != nil {
+			return nil, err
+		}
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", "Bearer "+apiKey)
+		return req, nil
+	})
 	if err != nil {
 		return "", model, err
 	}

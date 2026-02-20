@@ -127,10 +127,6 @@ func parseLegacyAskArgs(args []string) (agent.AskOptions, bool, string, string, 
 	return opts, confirmTools, riskPolicy, strings.Join(promptParts, " "), nil
 }
 
-func runAskOnce(baseDir, prompt string, opts agent.AskOptions, confirmTools bool) int {
-	return runAskOnceWithSession(baseDir, prompt, opts, confirmTools, riskPolicyNormal, nil, false)
-}
-
 type askJSONStep struct {
 	Step       int    `json:"step"`
 	Action     string `json:"action"`
@@ -528,10 +524,6 @@ func decisionSignature(decision agent.DecisionResult) string {
 	}
 }
 
-func runAskInteractive(baseDir string, opts agent.AskOptions, confirmTools bool) int {
-	return runAskInteractiveWithRisk(baseDir, opts, confirmTools, riskPolicyNormal)
-}
-
 func runAskInteractiveWithRisk(baseDir string, opts agent.AskOptions, confirmTools bool, riskPolicy string) int {
 	session, err := agent.ResolveSessionProvider(opts)
 	if err != nil {
@@ -654,15 +646,15 @@ func buildToolsCatalog() string {
 		"- search: Search files by name/extension | tool_args: base, ext, name, sort, limit, offset",
 		"- rename: Batch rename files with preview | tool_args: base, from, to, name, case_sensitive",
 		"- recent: Show recent files | tool_args: base, limit, offset",
-		"- backup: Create a folder zip backup",
+		"- backup: Create a folder zip backup | tool_args: source, output",
 		"- clean: Delete empty folders | tool_args: base, apply (true for delete, otherwise preview)",
-		"- system: Show system/network snapshot",
+		"- system: Show system/network snapshot (no args needed)",
 	}, "\n")
 }
 
 func isKnownTool(name string) bool {
 	switch strings.ToLower(strings.TrimSpace(name)) {
-	case "search", "s", "rename", "r", "recent", "rec", "e", "backup", "b", "clean", "c", "system", "sys", "htop", "y":
+	case "search", "s", "rename", "r", "recent", "rec", "backup", "b", "clean", "c", "system", "sys", "htop":
 		return true
 	default:
 		return false

@@ -12,7 +12,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func addCobraSubcommands(root *cobra.Command, opts *flags) {
+func addCobraSubcommands(root *cobra.Command) {
 	root.AddCommand(&cobra.Command{
 		Use:   "ps_profile",
 		Short: "Show functions and aliases from PowerShell $PROFILE",
@@ -41,7 +41,7 @@ func addCobraSubcommands(root *cobra.Command, opts *flags) {
 			"profile",
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			rt, err := loadRuntime(*opts)
+			rt, err := loadRuntime()
 			if err != nil {
 				return err
 			}
@@ -81,7 +81,7 @@ func addCobraSubcommands(root *cobra.Command, opts *flags) {
 			"profile",
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			rt, err := loadRuntime(*opts)
+			rt, err := loadRuntime()
 			if err != nil {
 				return err
 			}
@@ -89,16 +89,16 @@ func addCobraSubcommands(root *cobra.Command, opts *flags) {
 		},
 	})
 	root.AddCommand(openCmd)
-	root.AddCommand(newPluginCommand(opts))
-	root.AddCommand(newToolsCommand(opts))
-	root.AddCommand(newToolkitCommand(opts))
+	root.AddCommand(newPluginCommand())
+	root.AddCommand(newToolsCommand())
+	root.AddCommand(newToolkitCommand())
 	var doctorJSON bool
 	doctorCmd := &cobra.Command{
 		Use:   "doctor",
 		Short: "Run diagnostics for agent, providers, plugins, and tool paths",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			rt, err := loadRuntime(*opts)
+			rt, err := loadRuntime()
 			if err != nil {
 				return err
 			}
@@ -145,7 +145,7 @@ func addCobraSubcommands(root *cobra.Command, opts *flags) {
 			if riskErr != nil {
 				return riskErr
 			}
-			rt, err := loadRuntime(*opts)
+			rt, err := loadRuntime()
 			if err != nil {
 				return err
 			}
@@ -176,9 +176,9 @@ func addCobraSubcommands(root *cobra.Command, opts *flags) {
 	root.AddCommand(askCmd)
 }
 
-func newPluginCommand(opts *flags) *cobra.Command {
+func newPluginCommand() *cobra.Command {
 	runPluginArgs := func(args ...string) error {
-		rt, err := loadRuntime(*opts)
+		rt, err := loadRuntime()
 		if err != nil {
 			return err
 		}
@@ -230,7 +230,7 @@ func newPluginCommand(opts *flags) *cobra.Command {
 		Use:               "info <name>",
 		Short:             "Show plugin/function details",
 		Args:              cobra.ExactArgs(1),
-		ValidArgsFunction: completePluginEntryNames(opts),
+		ValidArgsFunction: completePluginEntryNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runPluginArgs("info", args[0])
 		},
@@ -247,7 +247,7 @@ func newPluginCommand(opts *flags) *cobra.Command {
 		Use:               "run <name> [args...]",
 		Short:             "Run a plugin",
 		Args:              cobra.MinimumNArgs(1),
-		ValidArgsFunction: completePluginEntryNames(opts),
+		ValidArgsFunction: completePluginEntryNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			out := append([]string{"run"}, args...)
 			return runPluginArgs(out...)
@@ -257,10 +257,10 @@ func newPluginCommand(opts *flags) *cobra.Command {
 	return pluginCmd
 }
 
-func completePluginEntryNames(opts *flags) func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
+func completePluginEntryNames() func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
 	return func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		rt, err := loadRuntime(*opts)
-		if err != nil {
+		rt, rtErr := loadRuntime()
+		if rtErr != nil {
 			return nil, cobra.ShellCompDirectiveNoFileComp
 		}
 		items, err := plugins.ListEntries(rt.BaseDir, true)
@@ -282,7 +282,7 @@ func completePluginEntryNames(opts *flags) func(*cobra.Command, []string, string
 	}
 }
 
-func newToolsCommand(opts *flags) *cobra.Command {
+func newToolsCommand() *cobra.Command {
 	toolsCmd := &cobra.Command{
 		Use:     "tools [tool]",
 		Aliases: []string{"tool"},
@@ -291,7 +291,7 @@ func newToolsCommand(opts *flags) *cobra.Command {
 		Example: "dm tools\ndm tools search\ndm tools system\ndm -t s",
 		Args:    cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			rt, err := loadRuntime(*opts)
+			rt, err := loadRuntime()
 			if err != nil {
 				return err
 			}
@@ -317,7 +317,7 @@ func newToolsCommand(opts *flags) *cobra.Command {
 			Example: example,
 			Args:    cobra.NoArgs,
 			RunE: func(cmd *cobra.Command, args []string) error {
-				rt, err := loadRuntime(*opts)
+				rt, err := loadRuntime()
 				if err != nil {
 					return err
 				}
