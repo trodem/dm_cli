@@ -25,34 +25,6 @@ func addCobraSubcommands(root *cobra.Command) {
 			return nil
 		},
 	})
-	cpCmd := &cobra.Command{
-		Use:   "cp",
-		Short: "Copy helper targets",
-		Args:  cobra.NoArgs,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return cmd.Help()
-		},
-	}
-	cpCmd.AddCommand(&cobra.Command{
-		Use:   "profile",
-		Short: "Overwrite PowerShell $PROFILE from plugins/functions/0_powershell_profile.ps1",
-		Args:  cobra.NoArgs,
-		ValidArgs: []string{
-			"profile",
-		},
-		RunE: func(cmd *cobra.Command, args []string) error {
-			rt, err := loadRuntime()
-			if err != nil {
-				return err
-			}
-			if err := copyPowerShellProfileFromPlugin(rt.BaseDir); err != nil {
-				return err
-			}
-			fmt.Println("OK: profile overwritten from plugins/functions/0_powershell_profile.ps1")
-			return nil
-		},
-	})
-	root.AddCommand(cpCmd)
 	openCmd := &cobra.Command{
 		Use:   "open",
 		Short: "Open profile files in Notepad",
@@ -70,22 +42,6 @@ func addCobraSubcommands(root *cobra.Command) {
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return openUserPowerShellProfileInNotepad()
-		},
-	})
-	openCmd.AddCommand(&cobra.Command{
-		Use:     "profile",
-		Aliases: []string{"profile-source", "profile-src"},
-		Short:   "Open plugins/functions/0_powershell_profile.ps1 in Notepad",
-		Args:    cobra.NoArgs,
-		ValidArgs: []string{
-			"profile",
-		},
-		RunE: func(cmd *cobra.Command, args []string) error {
-			rt, err := loadRuntime()
-			if err != nil {
-				return err
-			}
-			return openPluginPowerShellProfileInNotepad(rt.BaseDir)
 		},
 	})
 	root.AddCommand(openCmd)
@@ -217,14 +173,6 @@ func newPluginCommand() *cobra.Command {
 	}
 	listCmd.Flags().BoolVarP(&listFunctions, "functions", "f", false, "include discovered PowerShell functions")
 	pluginCmd.AddCommand(listCmd)
-	pluginCmd.AddCommand(&cobra.Command{
-		Use:   "$profile",
-		Short: "Show functions and aliases from plugins/functions/0_powershell_profile.ps1",
-		Args:  cobra.NoArgs,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return runPluginArgs("$profile")
-		},
-	})
 	pluginCmd.AddCommand(&cobra.Command{
 		Use:               "info <name>",
 		Short:             "Show plugin/function details",

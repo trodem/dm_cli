@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"strings"
 
+	"cli/internal/ui"
+
 	"github.com/spf13/cobra"
 )
 
@@ -27,10 +29,16 @@ func Run(args []string) int {
 		SilenceErrors: true,
 		SilenceUsage:  true,
 		RunE: func(cmd *cobra.Command, positional []string) error {
-			code := runLegacy(positional)
-			if code != 0 {
-				return exitCodeError{code: code}
+			rt, err := loadRuntime()
+			if err != nil {
+				return err
 			}
+			exeBuiltAt, _ := executableBuildTime()
+			ui.PrintSplash(ui.SplashData{
+				BaseDir:    rt.BaseDir,
+				Version:    Version,
+				ExeBuiltAt: exeBuiltAt,
+			})
 			return nil
 		},
 	}
@@ -73,9 +81,6 @@ func Run(args []string) int {
 			rest := parseFlags(rewriteGroupShortcuts(args))
 			if len(rest) > 0 && rest[0] == "$profile" {
 				return showPowerShellSymbols(resolveUserPowerShellProfilePath(), "$PROFILE")
-			}
-			if len(rest) > 1 && rest[0] == "plugins" && (rest[1] == "$profile" || strings.EqualFold(rest[1], "profile")) {
-				return runPlugin(rt.BaseDir, []string{"$profile"})
 			}
 			return runPluginOrSuggest(rt.BaseDir, rest)
 		}

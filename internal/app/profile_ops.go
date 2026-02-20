@@ -107,33 +107,9 @@ func parsePowerShellSymbols(path string) ([]string, []string, error) {
 	return funcs, aliases, nil
 }
 
-func copyPowerShellProfileFromPlugin(baseDir string) error {
-	src := filepath.Join(baseDir, "plugins", "functions", "0_powershell_profile.ps1")
-	if !fileExists(src) {
-		return fmt.Errorf("source not found: %s", src)
-	}
-	dst := resolveUserPowerShellProfilePath()
-	if strings.TrimSpace(dst) == "" {
-		return fmt.Errorf("PowerShell profile path is not available")
-	}
-	data, err := os.ReadFile(src)
-	if err != nil {
-		return err
-	}
-	if err := os.MkdirAll(filepath.Dir(dst), 0755); err != nil {
-		return err
-	}
-	return os.WriteFile(dst, data, 0644)
-}
-
 func openInNotepad(path string) error {
 	cmd := exec.Command("notepad.exe", path)
 	return cmd.Start()
-}
-
-func openPluginPowerShellProfileInNotepad(baseDir string) error {
-	src := filepath.Join(baseDir, "plugins", "functions", "0_powershell_profile.ps1")
-	return openInNotepad(src)
 }
 
 func openUserPowerShellProfileInNotepad() error {

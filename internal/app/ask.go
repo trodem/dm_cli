@@ -81,51 +81,7 @@ type askActionRecord struct {
 	Result string
 }
 
-func parseLegacyAskArgs(args []string) (agent.AskOptions, bool, string, string, error) {
-	var opts agent.AskOptions
-	confirmTools := true
-	riskPolicy := riskPolicyNormal
-	var promptParts []string
-	for i := 0; i < len(args); i++ {
-		switch args[i] {
-		case "--provider":
-			if i+1 >= len(args) {
-				return opts, confirmTools, riskPolicy, "", fmt.Errorf("missing value for --provider")
-			}
-			opts.Provider = args[i+1]
-			i++
-		case "--model":
-			if i+1 >= len(args) {
-				return opts, confirmTools, riskPolicy, "", fmt.Errorf("missing value for --model")
-			}
-			opts.Model = args[i+1]
-			i++
-		case "--base-url":
-			if i+1 >= len(args) {
-				return opts, confirmTools, riskPolicy, "", fmt.Errorf("missing value for --base-url")
-			}
-			opts.BaseURL = args[i+1]
-			i++
-		case "--risk-policy":
-			if i+1 >= len(args) {
-				return opts, confirmTools, riskPolicy, "", fmt.Errorf("missing value for --risk-policy")
-			}
-			p, err := normalizeRiskPolicy(args[i+1])
-			if err != nil {
-				return opts, confirmTools, riskPolicy, "", err
-			}
-			riskPolicy = p
-			i++
-		case "--confirm-tools":
-			confirmTools = true
-		case "--no-confirm-tools":
-			confirmTools = false
-		default:
-			promptParts = append(promptParts, args[i])
-		}
-	}
-	return opts, confirmTools, riskPolicy, strings.Join(promptParts, " "), nil
-}
+
 
 type askJSONStep struct {
 	Step       int    `json:"step"`

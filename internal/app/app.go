@@ -6,117 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"cli/internal/doctor"
 	"cli/internal/plugins"
-	"cli/internal/ui"
-	"cli/tools"
 )
-
-func runLegacy(args []string) int {
-	rest := parseFlags(args)
-	rt, err := loadRuntime()
-	if err != nil {
-		fmt.Println("Error:", err)
-		return 1
-	}
-	baseDir := rt.BaseDir
-
-	if len(rest) == 0 {
-		exeBuiltAt, _ := executableBuildTime()
-		ui.PrintSplash(ui.SplashData{
-			BaseDir:    baseDir,
-			Version:    Version,
-			ExeBuiltAt: exeBuiltAt,
-		})
-		return 0
-	}
-
-	args = rest
-	if len(args) > 0 && args[0] == "$profile" {
-		return showPowerShellSymbols(resolveUserPowerShellProfilePath(), "$PROFILE")
-	}
-
-	switch args[0] {
-	case "ps_profile":
-		return showPowerShellSymbols(resolveUserPowerShellProfilePath(), "$PROFILE")
-	case "cp":
-		if len(args) < 2 {
-			fmt.Println("Usage: dm cp profile")
-			return 0
-		}
-		if strings.EqualFold(args[1], "profile") {
-			if err := copyPowerShellProfileFromPlugin(baseDir); err != nil {
-				fmt.Println("Error:", err)
-				return 1
-			}
-			fmt.Println("OK: profile overwritten from plugins/functions/0_powershell_profile.ps1")
-			return 0
-		}
-		fmt.Println("Usage: dm cp profile")
-		return 0
-	case "open":
-		if len(args) < 2 {
-			fmt.Println("Usage: dm open <ps_profile|profile>")
-			return 0
-		}
-		switch strings.ToLower(strings.TrimSpace(args[1])) {
-		case "ps_profile":
-			if err := openUserPowerShellProfileInNotepad(); err != nil {
-				fmt.Println("Error:", err)
-				return 1
-			}
-			return 0
-		case "profile", "profile-source", "profile-src":
-			if err := openPluginPowerShellProfileInNotepad(baseDir); err != nil {
-				fmt.Println("Error:", err)
-				return 1
-			}
-			return 0
-		default:
-			fmt.Println("Usage: dm open <ps_profile|profile>")
-			return 0
-		}
-	case "doctor":
-		useJSON := false
-		for _, a := range args[1:] {
-			if strings.TrimSpace(a) == "--json" {
-				useJSON = true
-			}
-		}
-		report := doctor.Run(baseDir)
-		if useJSON {
-			if err := doctor.RenderJSON(report); err != nil {
-				fmt.Println("Error:", err)
-				return 1
-			}
-		} else {
-			doctor.RenderText(report)
-		}
-		if report.ErrorCount > 0 {
-			return 1
-		}
-		return 0
-	case "plugins":
-		return runPlugin(baseDir, args[1:])
-	case "tools":
-		if len(args) == 1 {
-			return tools.RunMenu(baseDir)
-		}
-		return tools.RunByName(baseDir, args[1])
-	case "ask":
-		askOpts, confirmTools, riskPolicy, prompt, err := parseLegacyAskArgs(args[1:])
-		if err != nil {
-			fmt.Println("Error:", err)
-			return 1
-		}
-		if strings.TrimSpace(prompt) == "" {
-			return runAskInteractiveWithRisk(baseDir, askOpts, confirmTools, riskPolicy)
-		}
-		return runAskOnceWithSession(baseDir, prompt, askOpts, confirmTools, riskPolicy, nil, false)
-	}
-
-	return runPluginOrSuggest(baseDir, args)
-}
 
 func runPluginOrSuggest(baseDir string, args []string) int {
 	if len(args) == 0 {
@@ -196,10 +87,6 @@ func runPlugin(baseDir string, args []string) int {
 	if len(args) == 0 {
 		return runPluginMenu(baseDir)
 	}
-	if args[0] == "$profile" || strings.EqualFold(args[0], "profile") {
-		path := filepath.Join(baseDir, "plugins", "functions", "0_powershell_profile.ps1")
-		return showPowerShellSymbols(path, "plugins/functions/0_powershell_profile.ps1")
-	}
 	switch args[0] {
 	case "menu":
 		return runPluginMenu(baseDir)
@@ -278,7 +165,7 @@ func runPlugin(baseDir string, args []string) int {
 		}
 		return 0
 	default:
-		if suggestion := suggestClosest(args[0], []string{"list", "info", "run", "menu", "profile"}, 3); suggestion != "" {
+		if suggestion := suggestClosest(args[0], []string{"list", "info", "run", "menu"}, 3); suggestion != "" {
 			fmt.Printf("Did you mean: dm plugins %s\n", suggestion)
 		}
 		fmt.Println("Usage: dm plugins <list|info|run|menu> ...")

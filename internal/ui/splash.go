@@ -31,10 +31,8 @@ func PrintSplash(d SplashData) {
 	fmt.Println(Prompt("dm ask") + Muted("                  Agent ask mode"))
 	fmt.Println(Prompt("dm doctor") + Muted("               Runtime diagnostics"))
 	fmt.Println(Muted("-----------"))
-	fmt.Println(Prompt("dm -o ps_profile") + Muted("  open $PROFILE in Notepad"))
-	fmt.Println(Prompt("dm -p profile") + Muted("     list functions/aliases from plugin profile file"))
-	fmt.Println(Prompt("dm ps_profile") + Muted("     List functions/aliases from PowerShell $PROFILE"))
-	fmt.Println(Prompt("dm cp profile") + Muted("     Overwrite $PROFILE from plugin profile file"))
+	fmt.Println(Prompt("dm -o ps_profile") + Muted("        open $PROFILE in Notepad"))
+	fmt.Println(Prompt("dm ps_profile") + Muted("           List functions/aliases from $PROFILE"))
 	fmt.Println(Prompt("dm completion install"))
 }
 
