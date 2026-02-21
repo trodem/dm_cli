@@ -114,12 +114,13 @@ func runAskOnceWithSession(baseDir, prompt string, opts agent.AskOptions, confir
 		catalog = buildPluginCatalog(baseDir)
 		toolsCatalog = buildToolsCatalog()
 	}
+	envContext := buildEnvContext()
 	history := []askActionRecord{}
 	jsonResult := askJSONOutput{Action: "answer", Steps: []askJSONStep{}}
 	lastSignature := ""
 	for step := 1; step <= askMaxSteps; step++ {
 		decisionPrompt := buildAskPlannerPrompt(prompt, history, previousPrompts)
-		decision, _, err := decideWithCache(decisionPrompt, catalog, toolsCatalog, opts)
+		decision, _, err := decideWithCache(decisionPrompt, catalog, toolsCatalog, opts, envContext)
 		if err != nil {
 			if jsonOut {
 				jsonResult.Action = "error"
@@ -465,13 +466,13 @@ func buildAskPlannerPrompt(original string, history []askActionRecord, previousP
 	return strings.Join(lines, "\n")
 }
 
-func decideWithCache(prompt, pluginCatalog, toolCatalog string, opts agent.AskOptions) (agent.DecisionResult, bool, error) {
-	key := decisionCacheKey(prompt, pluginCatalog, toolCatalog, opts)
+func decideWithCache(prompt, pluginCatalog, toolCatalog string, opts agent.AskOptions, envContext string) (agent.DecisionResult, bool, error) {
+	key := decisionCacheKey(prompt, pluginCatalog, toolCatalog, opts, envContext)
 	now := time.Now()
 	if cached, ok := askDecisionCache.Get(key, now); ok {
 		return cached, true, nil
 	}
-	decision, err := agent.DecideWithPlugins(prompt, pluginCatalog, toolCatalog, opts)
+	decision, err := agent.DecideWithPlugins(prompt, pluginCatalog, toolCatalog, opts, envContext)
 	if err != nil {
 		return agent.DecisionResult{}, false, err
 	}
@@ -479,7 +480,7 @@ func decideWithCache(prompt, pluginCatalog, toolCatalog string, opts agent.AskOp
 	return decision, false, nil
 }
 
-func decisionCacheKey(prompt, pluginCatalog, toolCatalog string, opts agent.AskOptions) string {
+func decisionCacheKey(prompt, pluginCatalog, toolCatalog string, opts agent.AskOptions, envContext string) string {
 	normalized := strings.Join([]string{
 		strings.TrimSpace(prompt),
 		strings.TrimSpace(pluginCatalog),
@@ -487,9 +488,18 @@ func decisionCacheKey(prompt, pluginCatalog, toolCatalog string, opts agent.AskO
 		strings.ToLower(strings.TrimSpace(opts.Provider)),
 		strings.TrimSpace(opts.Model),
 		strings.TrimSpace(opts.BaseURL),
+		strings.TrimSpace(envContext),
 	}, "\n---\n")
 	sum := sha256.Sum256([]byte(normalized))
 	return hex.EncodeToString(sum[:])
+}
+
+func buildEnvContext() string {
+	cwd, err := os.Getwd()
+	if err != nil {
+		return ""
+	}
+	return "- Working directory: " + cwd
 }
 
 func decisionSignature(decision agent.DecisionResult) string {

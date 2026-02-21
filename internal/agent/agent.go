@@ -191,7 +191,7 @@ func ResolveSessionProvider(opts AskOptions) (SessionProvider, error) {
 	}
 }
 
-func DecideWithPlugins(userPrompt string, pluginCatalog string, toolCatalog string, opts AskOptions) (DecisionResult, error) {
+func DecideWithPlugins(userPrompt string, pluginCatalog string, toolCatalog string, opts AskOptions, envContext string) (DecisionResult, error) {
 	p := strings.TrimSpace(userPrompt)
 	if p == "" {
 		return DecisionResult{}, fmt.Errorf("prompt is required")
@@ -202,7 +202,7 @@ func DecideWithPlugins(userPrompt string, pluginCatalog string, toolCatalog stri
 	if strings.TrimSpace(toolCatalog) == "" {
 		toolCatalog = "(none)"
 	}
-	decisionPrompt := strings.Join([]string{
+	parts := []string{
 		"You are an execution planner for a CLI assistant.",
 		"You can either answer directly, run a plugin (PowerShell function), or run a built-in tool.",
 		"",
@@ -234,10 +234,12 @@ func DecideWithPlugins(userPrompt string, pluginCatalog string, toolCatalog stri
 		"- For rename tool use tool_args keys: base, from, to, name, case_sensitive.",
 		"- For recent tool use tool_args keys: base, limit, offset.",
 		"- For clean tool use tool_args keys: base, apply (true for delete, otherwise preview).",
-		"",
-		"User request:",
-		p,
-	}, "\n")
+	}
+	if strings.TrimSpace(envContext) != "" {
+		parts = append(parts, "", "Environment context:", envContext)
+	}
+	parts = append(parts, "", "User request:", p)
+	decisionPrompt := strings.Join(parts, "\n")
 
 	raw, err := AskWithOptions(decisionPrompt, opts)
 	if err != nil {

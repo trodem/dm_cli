@@ -99,12 +99,12 @@ func TestDecisionCacheKeyStableWithTrim(t *testing.T) {
 		Model:    "gpt-4o-mini",
 		BaseURL:  " https://api.openai.com/v1 ",
 	}
-	k1 := decisionCacheKey("  test  ", "  pcat  ", "  tcat  ", opts)
+	k1 := decisionCacheKey("  test  ", "  pcat  ", "  tcat  ", opts, "  ctx  ")
 	k2 := decisionCacheKey("test", "pcat", "tcat", agent.AskOptions{
 		Provider: "openai",
 		Model:    "gpt-4o-mini",
 		BaseURL:  "https://api.openai.com/v1",
-	})
+	}, "ctx")
 	if k1 != k2 {
 		t.Fatalf("expected equal cache keys, got %q != %q", k1, k2)
 	}
