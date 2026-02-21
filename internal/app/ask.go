@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"regexp"
 	"sort"
 	"strings"
@@ -602,10 +603,18 @@ func buildPluginCatalog(baseDir string) string {
 	if err != nil || len(items) == 0 {
 		return "(none)"
 	}
-	lines := make([]string, 0, len(items))
+
+	type catalogEntry struct {
+		item plugins.Entry
+		line string
+	}
+
+	groups := map[string][]catalogEntry{}
+	groupOrder := []string{}
+
 	for _, item := range items {
 		info, _ := plugins.GetInfo(baseDir, item.Name)
-		line := fmt.Sprintf("- %s (%s)", item.Name, item.Kind)
+		line := fmt.Sprintf("- %s", item.Name)
 		if strings.TrimSpace(info.Synopsis) != "" {
 			line += ": " + info.Synopsis
 		}
@@ -614,9 +623,40 @@ func buildPluginCatalog(baseDir string) string {
 		} else if len(info.Parameters) > 0 {
 			line += " | params: " + strings.Join(info.Parameters, "; ")
 		}
-		lines = append(lines, line)
+
+		key := toolkitGroupKey(item.Path)
+		if _, exists := groups[key]; !exists {
+			groupOrder = append(groupOrder, key)
+		}
+		groups[key] = append(groups[key], catalogEntry{item: item, line: line})
 	}
-	return strings.Join(lines, "\n")
+
+	sort.Strings(groupOrder)
+
+	var out []string
+	for _, key := range groupOrder {
+		label := toolkitLabel(key)
+		out = append(out, fmt.Sprintf("\n[%s]", label))
+		for _, entry := range groups[key] {
+			out = append(out, entry.line)
+		}
+	}
+	return strings.Join(out, "\n")
+}
+
+func toolkitGroupKey(filePath string) string {
+	base := filepath.Base(filePath)
+	ext := filepath.Ext(base)
+	return strings.TrimSuffix(base, ext)
+}
+
+func toolkitLabel(groupKey string) string {
+	name := groupKey
+	if len(name) >= 2 && name[0] >= '0' && name[0] <= '9' && name[1] == '_' {
+		name = name[2:]
+	}
+	name = strings.TrimSuffix(name, "_Toolkit")
+	return strings.ReplaceAll(name, "_", " ")
 }
 
 func formatParamDetailsForCatalog(details []plugins.ParamDetail) string {
