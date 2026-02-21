@@ -416,6 +416,98 @@ func runAskOnceWithSession(baseDir, prompt string, opts agent.AskOptions, confir
 			continue
 		}
 
+		if decision.Action == "create_function" {
+			if jsonOut {
+				jsonResult.Action = "answer"
+				jsonResult.Answer = "create_function is not supported in JSON mode"
+				emitAskJSON(jsonResult)
+				return 0
+			}
+			desc := strings.TrimSpace(decision.FunctionDescription)
+			if desc == "" {
+				fmt.Println("Error: agent proposed create_function but provided no description")
+				return 1
+			}
+			if strings.TrimSpace(decision.Reason) != "" {
+				fmt.Println("Reason:", decision.Reason)
+			}
+			fmt.Printf("%s %d/%d: %s\n", ui.Accent("Plan step"), step, askMaxSteps, plannedActionSummary(decision))
+			fmt.Printf("%s HIGH (generates and writes new code)\n", ui.Warn("Risk:"))
+			reader := bufio.NewReader(os.Stdin)
+			fmt.Print(ui.Prompt("Create a new function? [y/N]: "))
+			confirm1 := strings.ToLower(strings.TrimSpace(readLine(reader)))
+			if confirm1 != "y" && confirm1 != "yes" {
+				fmt.Println(ui.Warn("Canceled."))
+				if strings.TrimSpace(decision.Answer) != "" {
+					fmt.Println(decision.Answer)
+				}
+				return 0
+			}
+			fmt.Println(ui.Muted("Generating function..."))
+			summaries := listToolkitSummaries(baseDir)
+			builderReq := agent.BuilderRequest{
+				FunctionDescription: desc,
+				ExistingToolkits:    summaries,
+				UserRequest:         prompt,
+			}
+			built, buildErr := agent.BuildFunction(builderReq, opts)
+			if buildErr != nil {
+				fmt.Println("Error generating function:", buildErr)
+				return 1
+			}
+			fmt.Println()
+			fmt.Println(ui.Accent("=== Generated function: " + built.FunctionName + " ==="))
+			fmt.Println(built.FunctionCode)
+			fmt.Println(ui.Accent("=== End of generated code ==="))
+			fmt.Println()
+			if strings.TrimSpace(built.Explanation) != "" {
+				fmt.Println(ui.Muted("Explanation: " + built.Explanation))
+			}
+			if built.IsNewToolkit {
+				fmt.Println(ui.Muted("Target: new toolkit " + built.TargetFile + " (prefix: " + built.NewPrefix + "_*)"))
+			} else {
+				fmt.Println(ui.Muted("Target: " + built.TargetFile))
+			}
+			fmt.Println()
+			fmt.Print(ui.Prompt("Approve and write this code? [y/N]: "))
+			confirm2 := strings.ToLower(strings.TrimSpace(readLine(reader)))
+			if confirm2 != "y" && confirm2 != "yes" {
+				fmt.Println(ui.Warn("Code not written. Canceled."))
+				return 0
+			}
+			pluginsDir := filepath.Join(baseDir, "plugins")
+			if built.IsNewToolkit {
+				toolkitName := strings.TrimSuffix(built.TargetFile, "_Toolkit.ps1")
+				toolkitName = strings.TrimSuffix(toolkitName, ".ps1")
+				writtenPath, writeErr := createNewToolkit(pluginsDir, toolkitName, built.NewPrefix, built.FunctionCode)
+				if writeErr != nil {
+					fmt.Println("Error writing toolkit:", writeErr)
+					return 1
+				}
+				fmt.Println(ui.Accent("Created: " + writtenPath))
+			} else {
+				targetPath := built.TargetFile
+				if !filepath.IsAbs(targetPath) {
+					targetPath = filepath.Join(pluginsDir, targetPath)
+				}
+				if err := appendFunctionToToolkit(targetPath, built.FunctionCode); err != nil {
+					fmt.Println("Error writing function:", err)
+					return 1
+				}
+				_ = updateToolkitFunctionsIndex(targetPath, built.FunctionName)
+				fmt.Println(ui.Accent("Added " + built.FunctionName + " to " + targetPath))
+			}
+			catalog = buildPluginCatalog(baseDir)
+			history = append(history, askActionRecord{
+				Step:   step,
+				Action: "create_function",
+				Target: built.FunctionName,
+				Result: "ok; function created",
+			})
+			fmt.Println(ui.Muted("Plugin catalog updated. Running the new function..."))
+			continue
+		}
+
 		jsonResult.Action = "answer"
 		jsonResult.Answer = decision.Answer
 		if jsonOut {
@@ -512,6 +604,8 @@ func decisionSignature(decision agent.DecisionResult) string {
 		return "run_plugin|" + strings.TrimSpace(decision.Plugin) + "|" + argsPart
 	case "run_tool":
 		return "run_tool|" + strings.TrimSpace(decision.Tool) + "|" + formatToolArgs(decision.ToolArgs)
+	case "create_function":
+		return "create_function|" + strings.TrimSpace(decision.FunctionDescription)
 	default:
 		return ""
 	}
@@ -814,6 +908,12 @@ func plannedActionSummary(decision agent.DecisionResult) string {
 			s += " (" + args + ")"
 		}
 		return s
+	case "create_function":
+		desc := strings.TrimSpace(decision.FunctionDescription)
+		if len(desc) > 80 {
+			desc = desc[:80] + "..."
+		}
+		return "create function: " + desc
 	default:
 		if strings.TrimSpace(decision.Answer) != "" {
 			return "answer"

@@ -60,16 +60,17 @@ type SessionProvider struct {
 }
 
 type DecisionResult struct {
-	Action     string
-	Answer     string
-	Plugin     string
-	PluginArgs map[string]string
-	Tool       string
-	ToolArgs   map[string]string
-	Args       []string
-	Reason     string
-	Provider   string
-	Model      string
+	Action              string
+	Answer              string
+	Plugin              string
+	PluginArgs          map[string]string
+	Tool                string
+	ToolArgs            map[string]string
+	Args                []string
+	Reason              string
+	FunctionDescription string
+	Provider            string
+	Model               string
 }
 
 func Ask(prompt string) (string, error) {
@@ -204,7 +205,7 @@ func DecideWithPlugins(userPrompt string, pluginCatalog string, toolCatalog stri
 	}
 	parts := []string{
 		"You are an execution planner for a CLI assistant.",
-		"You can either answer directly, run a plugin (PowerShell function), or run a built-in tool.",
+		"You can either answer directly, run a plugin (PowerShell function), run a built-in tool, or propose creating a new function.",
 		"",
 		"Available plugins (PowerShell functions):",
 		pluginCatalog,
@@ -216,6 +217,7 @@ func DecideWithPlugins(userPrompt string, pluginCatalog string, toolCatalog stri
 		`{"action":"answer","answer":"text"}`,
 		`{"action":"run_plugin","plugin":"name","plugin_args":{"ParamName":"value","SwitchParam":"true"},"reason":"why","answer":"optional text"}`,
 		`{"action":"run_tool","tool":"name","tool_args":{"key":"value"},"reason":"why","answer":"optional text"}`,
+		`{"action":"create_function","function_description":"detailed description of what the function should do, its inputs and outputs","reason":"why no existing plugin fits"}`,
 		"",
 		"Plugin argument rules:",
 		"- Use plugin_args (object) for named PowerShell parameters, NOT the args array.",
@@ -226,9 +228,10 @@ func DecideWithPlugins(userPrompt string, pluginCatalog string, toolCatalog stri
 		"- Only include parameters the user explicitly mentioned or that have obvious defaults.",
 		"",
 		"General rules:",
-		"- action must be answer, run_plugin, or run_tool.",
+		"- action must be answer, run_plugin, run_tool, or create_function.",
 		"- Do not invent plugin or tool names; use only the catalog above.",
-		"- If the user request does not match any plugin or tool, answer directly.",
+		"- If the user request requires an operation that no existing plugin or tool can handle, return action=create_function.",
+		"- Only use create_function for tasks that genuinely need a new automation capability, not for general knowledge questions.",
 		"- If a plugin requires confirmation or is destructive, mention it in the answer.",
 		"- For search tool use tool_args keys: base, ext, name, sort, limit, offset.",
 		"- For rename tool use tool_args keys: base, from, to, name, case_sensitive.",
@@ -252,7 +255,7 @@ func DecideWithPlugins(userPrompt string, pluginCatalog string, toolCatalog stri
 			if parsed2, p2Err := parseDecisionJSON(repaired.Text); p2Err == nil {
 				parsed2.Provider = repaired.Provider
 				parsed2.Model = repaired.Model
-				if parsed2.Action != "run_plugin" && parsed2.Action != "run_tool" {
+				if parsed2.Action != "run_plugin" && parsed2.Action != "run_tool" && parsed2.Action != "create_function" {
 					parsed2.Action = "answer"
 				}
 				return parsed2, nil
@@ -268,7 +271,7 @@ func DecideWithPlugins(userPrompt string, pluginCatalog string, toolCatalog stri
 	}
 	parsed.Provider = raw.Provider
 	parsed.Model = raw.Model
-	if parsed.Action != "run_plugin" && parsed.Action != "run_tool" {
+	if parsed.Action != "run_plugin" && parsed.Action != "run_tool" && parsed.Action != "create_function" {
 		parsed.Action = "answer"
 	}
 	return parsed, nil
@@ -282,6 +285,7 @@ func askDecisionJSONRepair(rawText string, opts AskOptions) (AskResult, error) {
 		`{"action":"answer","answer":"text"}`,
 		`{"action":"run_plugin","plugin":"name","plugin_args":{"ParamName":"value"},"reason":"why","answer":"optional text"}`,
 		`{"action":"run_tool","tool":"name","tool_args":{"key":"value"},"reason":"why","answer":"optional text"}`,
+		`{"action":"create_function","function_description":"description","reason":"why"}`,
 		"",
 		"Text:",
 		strings.TrimSpace(rawText),
@@ -305,14 +309,15 @@ func parseDecisionJSON(text string) (DecisionResult, error) {
 		payload = m
 	}
 	var obj struct {
-		Action     string         `json:"action"`
-		Answer     string         `json:"answer"`
-		Plugin     string         `json:"plugin"`
-		PluginArgs map[string]any `json:"plugin_args"`
-		Tool       string         `json:"tool"`
-		ToolArgs   map[string]any `json:"tool_args"`
-		Args       []string       `json:"args"`
-		Reason     string         `json:"reason"`
+		Action              string         `json:"action"`
+		Answer              string         `json:"answer"`
+		Plugin              string         `json:"plugin"`
+		PluginArgs          map[string]any `json:"plugin_args"`
+		Tool                string         `json:"tool"`
+		ToolArgs            map[string]any `json:"tool_args"`
+		Args                []string       `json:"args"`
+		Reason              string         `json:"reason"`
+		FunctionDescription string         `json:"function_description"`
 	}
 	if err := json.Unmarshal([]byte(payload), &obj); err != nil {
 		return DecisionResult{}, err
@@ -320,14 +325,15 @@ func parseDecisionJSON(text string) (DecisionResult, error) {
 	pluginArgs := sanitizeAnyMap(obj.PluginArgs)
 	toolArgs := sanitizeAnyMap(obj.ToolArgs)
 	return DecisionResult{
-		Action:     strings.ToLower(strings.TrimSpace(obj.Action)),
-		Answer:     strings.TrimSpace(obj.Answer),
-		Plugin:     strings.TrimSpace(obj.Plugin),
-		PluginArgs: pluginArgs,
-		Tool:       strings.TrimSpace(obj.Tool),
-		ToolArgs:   toolArgs,
-		Args:       obj.Args,
-		Reason:     strings.TrimSpace(obj.Reason),
+		Action:              strings.ToLower(strings.TrimSpace(obj.Action)),
+		Answer:              strings.TrimSpace(obj.Answer),
+		Plugin:              strings.TrimSpace(obj.Plugin),
+		PluginArgs:          pluginArgs,
+		Tool:                strings.TrimSpace(obj.Tool),
+		ToolArgs:            toolArgs,
+		Args:                obj.Args,
+		Reason:              strings.TrimSpace(obj.Reason),
+		FunctionDescription: strings.TrimSpace(obj.FunctionDescription),
 	}, nil
 }
 
