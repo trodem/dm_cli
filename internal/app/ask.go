@@ -236,27 +236,33 @@ func runAskOnceWithSession(baseDir, prompt string, opts agent.AskOptions, confir
 					return 0
 				}
 			}
-			if err := plugins.Run(baseDir, decision.Plugin, runArgs); err != nil {
+			runResult := plugins.RunWithOutput(baseDir, decision.Plugin, runArgs)
+			if runResult.Err != nil {
 				stepRecord.Status = "error"
 				jsonResult.Steps = append(jsonResult.Steps, stepRecord)
 				if jsonOut {
 					jsonResult.Action = "error"
-					jsonResult.Error = err.Error()
+					jsonResult.Error = runResult.Err.Error()
 					jsonResult.Answer = strings.TrimSpace(decision.Answer)
 					emitAskJSON(jsonResult)
 				} else {
-					printAgentActionError(err)
+					printAgentActionError(runResult.Err)
 				}
 				return 1
 			}
 			stepRecord.Status = "ok"
 			jsonResult.Steps = append(jsonResult.Steps, stepRecord)
+			capturedOutput := truncateForHistory(runResult.Output, 2000)
+			historyResult := "ok"
+			if capturedOutput != "" {
+				historyResult = "ok; output:\n" + capturedOutput
+			}
 			history = append(history, askActionRecord{
 				Step:   step,
 				Action: "run_plugin",
 				Target: decision.Plugin,
 				Args:   argsDisplay,
-				Result: "ok",
+				Result: historyResult,
 			})
 			if strings.TrimSpace(decision.Answer) != "" {
 				if jsonOut {
@@ -813,6 +819,14 @@ func emitAskJSON(v askJSONOutput) {
 }
 
 var missingPathErr = regexp.MustCompile(`(?i)required path '([^']+)' does not exist`)
+
+func truncateForHistory(s string, maxLen int) string {
+	s = strings.TrimSpace(s)
+	if len(s) <= maxLen {
+		return s
+	}
+	return s[:maxLen] + "\n... (truncated)"
+}
 
 func printAgentActionError(err error) {
 	fmt.Println("Error:", err)

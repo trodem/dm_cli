@@ -261,23 +261,35 @@ func buildInfoFileStamps(info Info) map[string]int64 {
 	return stamps
 }
 
+type RunResult struct {
+	Output string
+	Err    error
+}
+
 func Run(baseDir, name string, args []string) error {
+	r := RunWithOutput(baseDir, name, args)
+	return r.Err
+}
+
+func RunWithOutput(baseDir, name string, args []string) RunResult {
 	dir := filepath.Join(baseDir, "plugins")
 	candidate, err := findPlugin(dir, name)
 	if err != nil {
-		return err
+		return RunResult{Err: err}
 	}
 	if candidate == "" {
 		_, loadFiles, found, fErr := findPowerShellFunction(dir, name)
 		if fErr != nil {
-			return fErr
+			return RunResult{Err: fErr}
 		}
 		if !found {
-			return fmt.Errorf("%w: %s", ErrNotFound, name)
+			return RunResult{Err: fmt.Errorf("%w: %s", ErrNotFound, name)}
 		}
-		return runPowerShellFunction(loadFiles, name, args)
+		out, runErr := runPowerShellFunctionCapture(loadFiles, name, args)
+		return RunResult{Output: out, Err: runErr}
 	}
-	return execPlugin(candidate, args)
+	out, runErr := execPluginCapture(candidate, args)
+	return RunResult{Output: out, Err: runErr}
 }
 
 func IsNotFound(err error) bool {
@@ -785,22 +797,27 @@ func buildPowerShellFunctionScript(profilePaths []string, functionName string, a
 }
 
 func runPowerShellFunction(profilePaths []string, functionName string, args []string) error {
+	_, err := runPowerShellFunctionCapture(profilePaths, functionName, args)
+	return err
+}
+
+func runPowerShellFunctionCapture(profilePaths []string, functionName string, args []string) (string, error) {
 	ps := firstAvailableBinary("pwsh", "powershell")
 	if ps == "" {
-		return errors.New("pwsh/powershell executable not found")
+		return "", errors.New("pwsh/powershell executable not found")
 	}
 
 	scriptBody := buildPowerShellFunctionScript(profilePaths, functionName, args)
 
 	tmp, tmpErr := os.CreateTemp("", "dm-plugin-*.ps1")
 	if tmpErr != nil {
-		return tmpErr
+		return "", tmpErr
 	}
 	tmpPath := tmp.Name()
 	_ = tmp.Close()
 	defer func() { _ = os.Remove(tmpPath) }()
 	if writeErr := os.WriteFile(tmpPath, []byte(scriptBody), 0600); writeErr != nil {
-		return writeErr
+		return "", writeErr
 	}
 
 	cmd := exec.Command(ps, "-NoProfile", "-NonInteractive", "-File", tmpPath)
@@ -809,12 +826,17 @@ func runPowerShellFunction(profilePaths []string, functionName string, args []st
 	cmd.Stderr = io.MultiWriter(os.Stderr, &output)
 	cmd.Stdin = os.Stdin
 	if err := cmd.Run(); err != nil {
-		return &RunError{Err: err, Output: output.String()}
+		return output.String(), &RunError{Err: err, Output: output.String()}
 	}
-	return nil
+	return output.String(), nil
 }
 
 func execPlugin(path string, args []string) error {
+	_, err := execPluginCapture(path, args)
+	return err
+}
+
+func execPluginCapture(path string, args []string) (string, error) {
 	ext := strings.ToLower(filepath.Ext(path))
 	var cmd *exec.Cmd
 
@@ -824,13 +846,13 @@ func execPlugin(path string, args []string) error {
 		case ".ps1":
 			ps := firstAvailableBinary("pwsh", "powershell")
 			if ps == "" {
-				return errors.New("powershell executable not found")
+				return "", errors.New("powershell executable not found")
 			}
 			cmd = exec.Command(ps, "-NoProfile", "-NonInteractive", "-File", path)
 		case ".sh":
 			sh := firstAvailableBinary("sh", "bash")
 			if sh == "" {
-				return errors.New("sh/bash executable not found")
+				return "", errors.New("sh/bash executable not found")
 			}
 			cmd = exec.Command(sh, path)
 		case ".cmd", ".bat":
@@ -838,14 +860,14 @@ func execPlugin(path string, args []string) error {
 		case ".exe", "", ".out":
 			cmd = exec.Command(path)
 		default:
-			return errors.New("unsupported plugin type on windows")
+			return "", errors.New("unsupported plugin type on windows")
 		}
 	default:
 		switch ext {
 		case ".ps1":
 			ps := firstAvailableBinary("pwsh", "powershell")
 			if ps == "" {
-				return errors.New("pwsh/powershell executable not found")
+				return "", errors.New("pwsh/powershell executable not found")
 			}
 			cmd = exec.Command(ps, "-File", path)
 		case ".sh":
@@ -864,9 +886,9 @@ func execPlugin(path string, args []string) error {
 	cmd.Stderr = io.MultiWriter(os.Stderr, &output)
 	cmd.Stdin = os.Stdin
 	if err := cmd.Run(); err != nil {
-		return &RunError{Err: err, Output: output.String()}
+		return output.String(), &RunError{Err: err, Output: output.String()}
 	}
-	return nil
+	return output.String(), nil
 }
 
 func isSupportedPlugin(name string) bool {
