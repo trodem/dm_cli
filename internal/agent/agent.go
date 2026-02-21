@@ -141,54 +141,30 @@ func ResolveSessionProvider(opts AskOptions) (SessionProvider, error) {
 		if err := pingOllama(ollamaBase); err != nil {
 			return SessionProvider{}, fmt.Errorf("ollama unavailable: %w", err)
 		}
-		return SessionProvider{
-			Provider: "ollama",
-			Model:    ollamaModel,
-			Options: AskOptions{
-				Provider: "ollama",
-				Model:    ollamaModel,
-				BaseURL:  ollamaBase,
-			},
-		}, nil
+		return newSessionProvider("ollama", ollamaModel, ollamaBase), nil
 	case "openai":
 		if strings.TrimSpace(openAIKey) == "" {
 			return SessionProvider{}, fmt.Errorf("missing OpenAI API key (set in %s or OPENAI_API_KEY)", configPath())
 		}
-		return SessionProvider{
-			Provider: "openai",
-			Model:    openAIModel,
-			Options: AskOptions{
-				Provider: "openai",
-				Model:    openAIModel,
-				BaseURL:  openAIBase,
-			},
-		}, nil
+		return newSessionProvider("openai", openAIModel, openAIBase), nil
 	case "auto":
 		if err := pingOllama(ollamaBase); err == nil {
-			return SessionProvider{
-				Provider: "ollama",
-				Model:    ollamaModel,
-				Options: AskOptions{
-					Provider: "ollama",
-					Model:    ollamaModel,
-					BaseURL:  ollamaBase,
-				},
-			}, nil
+			return newSessionProvider("ollama", ollamaModel, ollamaBase), nil
 		}
 		if strings.TrimSpace(openAIKey) == "" {
 			return SessionProvider{}, fmt.Errorf("ollama unavailable and OpenAI API key is missing")
 		}
-		return SessionProvider{
-			Provider: "openai",
-			Model:    openAIModel,
-			Options: AskOptions{
-				Provider: "openai",
-				Model:    openAIModel,
-				BaseURL:  openAIBase,
-			},
-		}, nil
+		return newSessionProvider("openai", openAIModel, openAIBase), nil
 	default:
 		return SessionProvider{}, fmt.Errorf("invalid provider %q (use auto|ollama|openai)", opts.Provider)
+	}
+}
+
+func newSessionProvider(provider, model, baseURL string) SessionProvider {
+	return SessionProvider{
+		Provider: provider,
+		Model:    model,
+		Options:  AskOptions{Provider: provider, Model: model, BaseURL: baseURL},
 	}
 }
 
