@@ -28,52 +28,54 @@ type BuilderResult struct {
 	Explanation  string `json:"explanation"`
 }
 
-const toolkitConventions = `PowerShell Toolkit Conventions (MUST follow):
+const toolkitConventions = `PowerShell Toolkit Conventions (MUST follow strictly):
 
 NAMING:
 - Public functions: <prefix>_<action>, all lowercase (e.g. excel_sheets, pdf_pages)
 - The prefix must be short, unique, and domain-descriptive
-- Private helpers start with _ (e.g. _assert_command_available)
+- Parameter names MUST use PascalCase (e.g. $FilePath, $SheetName — NOT $file_path)
 
-HELP BLOCKS (mandatory on every function):
+REQUIRED FUNCTION STRUCTURE — every function MUST follow this exact pattern:
+
 <#
 .SYNOPSIS
-One-line summary.
+One-line summary of what the function does.
 .DESCRIPTION
-More detail if synopsis is not self-explanatory.
-.PARAMETER ParamName
-Description.
+More detail when the synopsis alone is not enough.
+.PARAMETER FilePath
+Description of this parameter.
 .EXAMPLE
-prefix_action -ParamName value
+prefix_action -FilePath "C:\data\file.xlsx"
 #>
+function prefix_action {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$FilePath
+    )
 
-PARAMETERS:
-- Mark mandatory params: [Parameter(Mandatory = $true)]
-- Use [ValidateSet(...)] for closed domains
+    _assert_path_exists -Path $FilePath
 
-RETURN VALUES:
-- Return [pscustomobject]@{ ... } for multi-field outputs
-- Never use Write-Host — return values directly
+    # ... function body ...
 
-CODING STYLE:
+    return [pscustomobject]@{
+        Result = $value
+    }
+}
+
+CRITICAL RULES:
+- Parameters MUST be inside a param() block
+- Do NOT place [Parameter()] attributes outside param()
+- Do NOT use trailing commas after the last parameter in param()
+- Do NOT use Write-Host — return values directly
+- Use throw for errors
 - Use Test-Path -LiteralPath (not -Path)
-- Place $null on the left: $null -eq $x
-- Use throw for errors, not Write-Host
-- Use Set-StrictMode -Version Latest and $ErrorActionPreference = "Stop"
+- Place $null on the left of comparisons: $null -eq $x
+- Return [pscustomobject]@{ ... } for structured output
 
-GUARD HELPERS (define inside the toolkit, not imported):
-- _assert_command_available -Name <tool>: check external tool exists in PATH
-- _assert_path_exists -Path <path>: check filesystem path exists
-
-STANDALONE:
-- Every toolkit must be fully self-contained, zero cross-file dependencies
-- Define its own guard helpers internally
-
-TOOLKIT FILE STRUCTURE (for new toolkits):
-1. Header banner (bordered with = lines) with name, safety, entry point, FUNCTIONS index
-2. Set-StrictMode + $ErrorActionPreference
-3. Internal helpers (prefixed with _)
-4. Public functions`
+GUARD HELPERS — the toolkit boilerplate already provides these:
+- _assert_command_available -Name <tool>
+- _assert_path_exists -Path <path>
+You can CALL these helpers in your function. Do NOT redefine them.`
 
 func BuildFunction(req BuilderRequest, opts AskOptions) (BuilderResult, error) {
 	var toolkitInfo strings.Builder
@@ -111,9 +113,14 @@ func BuildFunction(req BuilderRequest, opts AskOptions) (BuilderResult, error) {
 		"3. If a new toolkit is needed, choose a short unique prefix and set is_new_toolkit=true.",
 		"   For new toolkits, set target_file to the suggested file name (e.g. Excel_Toolkit.ps1).",
 		"4. Generate ONLY the function code (with help block above it).",
-		"   Do NOT include the full toolkit boilerplate (headers, strict mode, helpers) — only the function itself.",
-		"   If the function needs guard helpers (_assert_command_available, _assert_path_exists), include them as separate functions BEFORE the main function.",
-		"5. The function MUST return [pscustomobject] for structured output.",
+		"   Do NOT include toolkit boilerplate (headers, Set-StrictMode, $ErrorActionPreference, guard helpers).",
+		"   The boilerplate is added automatically. You only write the function(s).",
+		"5. Do NOT define _assert_command_available or _assert_path_exists — they already exist.",
+		"   You may CALL them inside your function body.",
+		"6. The function MUST return [pscustomobject] for structured output.",
+		"7. Parameters MUST be inside a param() block. NEVER place [Parameter()] outside param().",
+		"8. Parameter names MUST be PascalCase (e.g. $FilePath, not $file_path).",
+		"9. Do NOT put a trailing comma after the last parameter in param().",
 		"",
 		"Return ONLY valid JSON with this schema:",
 		`{"function_name":"prefix_action","function_code":"<complete PowerShell code>","target_file":"path","is_new_toolkit":false,"new_prefix":"","explanation":"brief explanation"}`,
@@ -146,16 +153,12 @@ func parseBuilderJSON(text string) (BuilderResult, error) {
 	if trimmed == "" {
 		return BuilderResult{}, fmt.Errorf("empty builder response")
 	}
-	payload := trimmed
-	if !strings.HasPrefix(payload, "{") {
-		m := jsonBlockRe.FindString(trimmed)
-		if m == "" {
-			return BuilderResult{}, fmt.Errorf("no json object found in builder response")
-		}
-		payload = m
+	m := jsonBlockRe.FindString(trimmed)
+	if m == "" {
+		return BuilderResult{}, fmt.Errorf("no json object found in builder response")
 	}
 	var result BuilderResult
-	if err := json.Unmarshal([]byte(payload), &result); err != nil {
+	if err := json.Unmarshal([]byte(m), &result); err != nil {
 		return BuilderResult{}, err
 	}
 	result.FunctionCode = strings.ReplaceAll(result.FunctionCode, "\\n", "\n")

@@ -1,8 +1,10 @@
 package app
 
 import (
+	"bytes"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -179,4 +181,23 @@ function _assert_path_exists {
 
 	fullContent := header + strings.TrimSpace(functionCode) + "\n"
 	return filePath, os.WriteFile(filePath, []byte(fullContent), 0644)
+}
+
+func validatePowerShellSyntax(code string) error {
+	pwsh, err := exec.LookPath("pwsh")
+	if err != nil {
+		return nil
+	}
+	cmd := exec.Command(pwsh, "-NoProfile", "-Command", "[scriptblock]::Create($input)")
+	cmd.Stdin = bytes.NewReader([]byte(code))
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	if runErr := cmd.Run(); runErr != nil {
+		msg := strings.TrimSpace(stderr.String())
+		if msg == "" {
+			msg = runErr.Error()
+		}
+		return fmt.Errorf("PowerShell syntax error:\n%s", msg)
+	}
+	return nil
 }

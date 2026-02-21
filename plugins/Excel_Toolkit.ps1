@@ -1,10 +1,10 @@
 # =============================================================================
 # EXCEL TOOLKIT – Auto-generated toolkit (standalone)
 # Safety: Review generated functions before use.
-# Entry point: excel__*
+# Entry point: ods_count_*
 #
 # FUNCTIONS
-#   excel_sheets
+#   ods_count_sheets
 # =============================================================================
 
 Set-StrictMode -Version Latest
@@ -50,35 +50,33 @@ function _assert_path_exists {
 
 <#
 .SYNOPSIS
-Returns the number of sheets in an Excel file.
+Counts the number of sheets in an ODS file.
 .DESCRIPTION
-This function takes a file path to an Excel file and returns the count of sheets contained in that file.
+This function takes the file path of an ODS file as input and returns the number of sheets it contains.
 .PARAMETER FilePath
-The full path to the Excel file.
+The full path to the ODS file.
 .EXAMPLE
-excel_sheets -FilePath 'C:\Users\Demtro\Downloads\PA.Template{0.0}.xlsx'
+ods_count_sheets -FilePath "C:\Users\Demtro\Downloads\test_file.ods"
 #>
-function excel_sheets {
+function ods_count_sheets {
     param(
         [Parameter(Mandatory = $true)]
         [string]$FilePath
     )
 
     _assert_path_exists -Path $FilePath
-    
-    $excel = [Runtime.Interopservices.Marshal]::GetActiveObject("Excel.Application")
-    $workbook = $excel.Workbooks.Open($FilePath)
-    $sheetCount = $workbook.Sheets.Count
-    $workbook.Close($false)
-    return [pscustomobject]@{ SheetCount = $sheetCount }
-}
 
-function _assert_path_exists {
-    param(
-        [Parameter(Mandatory = $true)]
-        [string]$Path
-    )
-    if ($null -eq (Test-Path -LiteralPath $Path)) {
-        throw "The specified path does not exist: $Path"
+    # Load the ODS file and count sheets
+    try {
+        $doc = [System.IO.Packaging.Package]::Open($FilePath, [System.IO.FileMode]::Open)
+        $sheets = $doc.GetParts() | Where-Object { $_.Uri.OriginalString -like "*content.xml" }
+        $sheetCount = $sheets.Count
+        $doc.Close()
+    } catch {
+        throw "Failed to load ODS file: $_"
+    }
+
+    return [pscustomobject]@{
+        SheetCount = $sheetCount
     }
 }

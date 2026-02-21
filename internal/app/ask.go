@@ -246,10 +246,22 @@ func runAskOnceWithSession(baseDir, prompt string, opts agent.AskOptions, confir
 					jsonResult.Error = runResult.Err.Error()
 					jsonResult.Answer = strings.TrimSpace(decision.Answer)
 					emitAskJSON(jsonResult)
-				} else {
-					printAgentActionError(runResult.Err)
+					return 1
 				}
-				return 1
+				printAgentActionError(runResult.Err)
+				errOutput := truncateForHistory(runResult.Output, 2000)
+				errMsg := runResult.Err.Error()
+				if errOutput != "" {
+					errMsg += "\n" + errOutput
+				}
+				history = append(history, askActionRecord{
+					Step:   step,
+					Action: "run_plugin",
+					Target: decision.Plugin,
+					Args:   argsDisplay,
+					Result: "error: " + truncateForHistory(errMsg, 2000),
+				})
+				continue
 			}
 			stepRecord.Status = "ok"
 			jsonResult.Steps = append(jsonResult.Steps, stepRecord)
@@ -358,8 +370,16 @@ func runAskOnceWithSession(baseDir, prompt string, opts agent.AskOptions, confir
 					jsonResult.Error = fmt.Sprintf("tool execution failed: %s", toolName)
 					jsonResult.Answer = strings.TrimSpace(decision.Answer)
 					emitAskJSON(jsonResult)
+					return run.Code
 				}
-				return run.Code
+				history = append(history, askActionRecord{
+					Step:   step,
+					Action: "run_tool",
+					Target: toolName,
+					Args:   formatToolArgs(decision.ToolArgs),
+					Result: fmt.Sprintf("error: tool execution failed (exit code %d)", run.Code),
+				})
+				continue
 			}
 			reader := bufio.NewReader(os.Stdin)
 			for run.CanContinue {
@@ -381,8 +401,16 @@ func runAskOnceWithSession(baseDir, prompt string, opts agent.AskOptions, confir
 						jsonResult.Error = fmt.Sprintf("tool continuation failed: %s", toolName)
 						jsonResult.Answer = strings.TrimSpace(decision.Answer)
 						emitAskJSON(jsonResult)
+						return run.Code
 					}
-					return run.Code
+					history = append(history, askActionRecord{
+						Step:   step,
+						Action: "run_tool",
+						Target: toolName,
+						Args:   formatToolArgs(decision.ToolArgs),
+						Result: fmt.Sprintf("error: tool continuation failed (exit code %d)", run.Code),
+					})
+					break
 				}
 			}
 			stepRecord.Status = "ok"
@@ -450,13 +478,25 @@ func runAskOnceWithSession(baseDir, prompt string, opts agent.AskOptions, confir
 				ExistingToolkits:    summaries,
 				UserRequest:         prompt,
 			}
-			built, buildErr := agent.BuildFunction(builderReq, opts)
-			if buildErr != nil {
-				fmt.Println("Error generating function:", buildErr)
-				return 1
-			}
-			fmt.Println()
-			fmt.Println(ui.Accent("=== Generated function: " + built.FunctionName + " ==="))
+		built, buildErr := agent.BuildFunction(builderReq, opts)
+		if buildErr != nil {
+			fmt.Println("Error generating function:", buildErr)
+			return 1
+		}
+		if valErr := validatePowerShellSyntax(built.FunctionCode); valErr != nil {
+			fmt.Println(ui.Warn("Generated code has syntax errors:"))
+			fmt.Println(valErr)
+			fmt.Println(ui.Muted("Aborting — code will NOT be written to disk."))
+			history = append(history, askActionRecord{
+				Step:   step,
+				Action: "create_function",
+				Target: built.FunctionName,
+				Result: "syntax validation failed: " + valErr.Error(),
+			})
+			continue
+		}
+		fmt.Println()
+		fmt.Println(ui.Accent("=== Generated function: " + built.FunctionName + " ==="))
 			fmt.Println(built.FunctionCode)
 			fmt.Println(ui.Accent("=== End of generated code ==="))
 			fmt.Println()
@@ -476,20 +516,32 @@ func runAskOnceWithSession(baseDir, prompt string, opts agent.AskOptions, confir
 				return 0
 			}
 			pluginsDir := filepath.Join(baseDir, "plugins")
-			if built.IsNewToolkit {
-				toolkitName := strings.TrimSuffix(built.TargetFile, "_Toolkit.ps1")
+			needsNewToolkit := built.IsNewToolkit
+			targetPath := built.TargetFile
+			if !needsNewToolkit {
+				if !filepath.IsAbs(targetPath) {
+					targetPath = filepath.Join(pluginsDir, targetPath)
+				}
+				if _, statErr := os.Stat(targetPath); os.IsNotExist(statErr) {
+					needsNewToolkit = true
+					fmt.Println(ui.Muted("Target file not found, creating new toolkit instead."))
+				}
+			}
+			if needsNewToolkit {
+				baseName := filepath.Base(built.TargetFile)
+				toolkitName := strings.TrimSuffix(baseName, "_Toolkit.ps1")
 				toolkitName = strings.TrimSuffix(toolkitName, ".ps1")
-				writtenPath, writeErr := createNewToolkit(pluginsDir, toolkitName, built.NewPrefix, built.FunctionCode)
+				prefix := built.NewPrefix
+				if prefix == "" {
+					prefix = derivePrefix([]string{built.FunctionName})
+				}
+				writtenPath, writeErr := createNewToolkit(pluginsDir, toolkitName, prefix, built.FunctionCode)
 				if writeErr != nil {
 					fmt.Println("Error writing toolkit:", writeErr)
 					return 1
 				}
 				fmt.Println(ui.Accent("Created: " + writtenPath))
 			} else {
-				targetPath := built.TargetFile
-				if !filepath.IsAbs(targetPath) {
-					targetPath = filepath.Join(pluginsDir, targetPath)
-				}
 				if err := appendFunctionToToolkit(targetPath, built.FunctionCode); err != nil {
 					fmt.Println("Error writing function:", err)
 					return 1
