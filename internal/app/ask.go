@@ -104,9 +104,16 @@ type askJSONOutput struct {
 	Error    string        `json:"error,omitempty"`
 }
 
-func runAskOnceWithSession(baseDir, prompt string, opts agent.AskOptions, confirmTools bool, riskPolicy string, previousPrompts []string, jsonOut bool) int {
-	catalog := buildPluginCatalog(baseDir)
-	toolsCatalog := buildToolsCatalog()
+func runAskOnceWithSession(baseDir, prompt string, opts agent.AskOptions, confirmTools bool, riskPolicy string, previousPrompts []string, jsonOut bool, catalogs ...string) int {
+	catalog := ""
+	toolsCatalog := ""
+	if len(catalogs) >= 2 {
+		catalog = catalogs[0]
+		toolsCatalog = catalogs[1]
+	} else {
+		catalog = buildPluginCatalog(baseDir)
+		toolsCatalog = buildToolsCatalog()
+	}
 	history := []askActionRecord{}
 	jsonResult := askJSONOutput{Action: "answer", Steps: []askJSONStep{}}
 	lastSignature := ""
@@ -503,6 +510,9 @@ func runAskInteractiveWithRisk(baseDir string, opts agent.AskOptions, confirmToo
 	sessionOpts := session.Options
 	promptLabel := fmt.Sprintf("ask(%s,%s)> ", session.Provider, session.Model)
 
+	catalog := buildPluginCatalog(baseDir)
+	toolsCatalog := buildToolsCatalog()
+
 	fmt.Println("Ask mode. Type your question.")
 	fmt.Println("Exit commands: /exit, exit, quit")
 	reader := bufio.NewReader(os.Stdin)
@@ -510,7 +520,7 @@ func runAskInteractiveWithRisk(baseDir string, opts agent.AskOptions, confirmToo
 
 	if strings.TrimSpace(initialPrompt) != "" {
 		fmt.Printf("%s%s\n", ui.Warn(promptLabel), initialPrompt)
-		_ = runAskOnceWithSession(baseDir, initialPrompt, sessionOpts, confirmTools, riskPolicy, previousPrompts, false)
+		_ = runAskOnceWithSession(baseDir, initialPrompt, sessionOpts, confirmTools, riskPolicy, previousPrompts, false, catalog, toolsCatalog)
 		previousPrompts = append(previousPrompts, initialPrompt)
 	}
 
@@ -528,7 +538,7 @@ func runAskInteractiveWithRisk(baseDir string, opts agent.AskOptions, confirmToo
 		case "/exit", "exit", "quit":
 			return 0
 		}
-		_ = runAskOnceWithSession(baseDir, prompt, sessionOpts, confirmTools, riskPolicy, previousPrompts, false)
+		_ = runAskOnceWithSession(baseDir, prompt, sessionOpts, confirmTools, riskPolicy, previousPrompts, false, catalog, toolsCatalog)
 		previousPrompts = append(previousPrompts, prompt)
 		if len(previousPrompts) > 6 {
 			previousPrompts = previousPrompts[len(previousPrompts)-6:]
