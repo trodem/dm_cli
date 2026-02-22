@@ -111,8 +111,11 @@ function _wifi_profiles {
     $lines = netsh wlan show profiles
     $profiles = @()
     foreach ($line in $lines) {
-        if ($line -match "All User Profile\s*:\s*(.+)$") {
-            $profiles += $Matches[1].Trim()
+        if ($line -match "^\s*.+\s+:\s+(.+)$" -and $line -notmatch "^-" -and $line -notmatch "<") {
+            $name = $Matches[1].Trim()
+            if ($name -ne "") {
+                $profiles += $name
+            }
         }
     }
     return $profiles

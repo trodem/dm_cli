@@ -18,6 +18,7 @@
 #   dc_build_all
 #   dc_exec
 #   dc_shell
+#   dc_kill
 # =============================================================================
 
 Set-StrictMode -Version Latest
@@ -105,6 +106,22 @@ _dc up -d
 function _dc {
     $composeFile = _dc_resolve_compose_file
     docker compose -f $composeFile @args
+}
+
+<#
+.SYNOPSIS
+Ask user for confirmation before a destructive action.
+.PARAMETER Message
+Prompt text to display.
+.EXAMPLE
+_confirm_action -Message "Stop all containers?"
+#>
+function _confirm_action {
+    param([Parameter(Mandatory = $true)][string]$Message)
+    $answer = Read-Host "$Message [y/N]"
+    if ($answer -notin @("y", "Y", "yes", "Yes")) {
+        throw "Canceled by user."
+    }
 }
 
 # -----------------------------------------------------------------------------
@@ -345,4 +362,58 @@ function dc_shell {
 
     _assert_command_available -Name docker
     _dc exec $Service sh
+}
+
+# -----------------------------------------------------------------------------
+# Kill
+# -----------------------------------------------------------------------------
+
+<#
+.SYNOPSIS
+Stop and remove all running Docker containers on the system.
+.DESCRIPTION
+Lists every running container, stops them, then removes them.
+Requires -Force or interactive confirmation because it affects
+ALL containers, not just the current compose stack.
+Volumes and images are NOT removed.
+.PARAMETER Force
+Skip confirmation prompt.
+.EXAMPLE
+dc_kill
+.EXAMPLE
+dc_kill -Force
+#>
+function dc_kill {
+    param(
+        [switch]$Force
+    )
+
+    _assert_command_available -Name docker
+
+    $ids = docker ps -q
+    if ($null -eq $ids -or ($ids | Measure-Object).Count -eq 0) {
+        return [pscustomobject]@{
+            Status     = "clean"
+            Message    = "No running containers found."
+            Stopped    = 0
+        }
+    }
+
+    $containers = docker ps --format "{{.ID}}  {{.Names}}  {{.Image}}"
+    $count = ($ids | Measure-Object).Count
+
+    if (-not $Force) {
+        Write-Host "Running containers ($count):"
+        Write-Host $containers
+        _confirm_action -Message "Stop and remove all $count containers?"
+    }
+
+    docker stop $ids | Out-Null
+    docker rm $ids | Out-Null
+
+    return [pscustomobject]@{
+        Status     = "done"
+        Message    = "Stopped and removed $count containers."
+        Stopped    = $count
+    }
 }
