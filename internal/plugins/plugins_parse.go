@@ -11,6 +11,8 @@ import (
 )
 
 var (
+	psFunctionLine    = regexp.MustCompile(`(?i)^\s*function\s+([a-z0-9_-]+)\b`)
+	psNamedTag        = regexp.MustCompile(`(?i)^\.(synopsis|description|example|parameter)\b(?:\s+([a-z0-9_-]+))?\s*$`)
 	psParamMandatory  = regexp.MustCompile(`(?i)\[Parameter\s*\([^)]*Mandatory\b`)
 	psParamVarLine    = regexp.MustCompile(`(?i)^\s*(?:\[([^\]]+)\])?\s*\$(\w+)`)
 	psValidateSetLine = regexp.MustCompile(`(?i)\[ValidateSet\s*\(([^)]+)\)\]`)

@@ -17,7 +17,7 @@ func runPluginMenu(baseDir string) int {
 	for {
 		files, err := plugins.ListFunctionFiles(baseDir)
 		if err != nil {
-			fmt.Println("Error:", err)
+			fmt.Fprintln(os.Stderr, "Error:", err)
 			return 1
 		}
 		if len(files) == 0 {
@@ -134,7 +134,7 @@ func runPluginFunctionsMenu(baseDir string, file plugins.FunctionFile, reader *b
 		rawArgs := strings.TrimSpace(readLine(reader))
 		parsedArgs, err := splitMenuArgs(rawArgs)
 		if err != nil {
-			fmt.Println("Error:", err)
+			fmt.Fprintln(os.Stderr, "Error:", err)
 			continue
 		}
 		runArgs = append(runArgs, parsedArgs...)

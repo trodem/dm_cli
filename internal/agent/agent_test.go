@@ -435,3 +435,55 @@ func TestDoWithRetry_NoRetryOn4xx(t *testing.T) {
 		t.Fatalf("expected 1 call (no retry on 4xx), got %d", calls)
 	}
 }
+
+func TestDoWithRetry_RetriesOn429(t *testing.T) {
+	origDelay := retryDelay
+	retryDelay = 1 // near-instant for test speed
+	defer func() { retryDelay = origDelay }()
+
+	var calls int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		n := atomic.AddInt32(&calls, 1)
+		if n <= 2 {
+			w.WriteHeader(429)
+			return
+		}
+		w.WriteHeader(200)
+		w.Write([]byte("ok"))
+	}))
+	defer srv.Close()
+
+	res, err := doWithRetry(func() (*http.Request, error) {
+		return http.NewRequest(http.MethodGet, srv.URL, nil)
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	res.Body.Close()
+	if atomic.LoadInt32(&calls) != 3 {
+		t.Fatalf("expected 3 calls (2 retries after 429), got %d", calls)
+	}
+}
+
+func TestDoWithRetry_ExhaustsRetries(t *testing.T) {
+	origDelay := retryDelay
+	retryDelay = 1
+	defer func() { retryDelay = origDelay }()
+
+	var calls int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		atomic.AddInt32(&calls, 1)
+		w.WriteHeader(500)
+	}))
+	defer srv.Close()
+
+	_, err := doWithRetry(func() (*http.Request, error) {
+		return http.NewRequest(http.MethodGet, srv.URL, nil)
+	})
+	if err == nil {
+		t.Fatal("expected error after exhausting retries")
+	}
+	if atomic.LoadInt32(&calls) != 3 {
+		t.Fatalf("expected 3 calls (1 initial + 2 retries), got %d", calls)
+	}
+}

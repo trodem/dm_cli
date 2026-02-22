@@ -17,7 +17,7 @@ const (
 	defaultOllamaModel   = "deepseek-coder-v2:latest"
 	defaultOpenAIBaseURL = "https://api.openai.com/v1"
 	defaultOpenAIModel   = "gpt-4o-mini"
-	maxRetries           = 1
+	maxRetries           = 2
 )
 
 var (
@@ -73,21 +73,16 @@ type DecisionResult struct {
 	Model               string
 }
 
-func Ask(prompt string) (string, error) {
-	res, err := AskWithOptions(prompt, AskOptions{})
-	if err != nil {
-		return "", err
-	}
-	return res.Text, nil
-}
-
 func AskWithOptions(prompt string, opts AskOptions) (AskResult, error) {
 	text := strings.TrimSpace(prompt)
 	if text == "" {
 		return AskResult{}, fmt.Errorf("prompt is required")
 	}
 
-	cfg, _ := loadUserConfig()
+	cfg, cfgErr := loadUserConfig()
+	if cfgErr != nil {
+		fmt.Fprintln(os.Stderr, "Warning: failed to load config:", cfgErr)
+	}
 
 	provider := strings.ToLower(strings.TrimSpace(opts.Provider))
 	if provider == "" {
@@ -125,7 +120,10 @@ func AskWithOptions(prompt string, opts AskOptions) (AskResult, error) {
 }
 
 func ResolveSessionProvider(opts AskOptions) (SessionProvider, error) {
-	cfg, _ := loadUserConfig()
+	cfg, cfgErr := loadUserConfig()
+	if cfgErr != nil {
+		fmt.Fprintln(os.Stderr, "Warning: failed to load config:", cfgErr)
+	}
 	applyOllamaOverrides(&cfg, opts)
 	applyOpenAIOverrides(&cfg, opts)
 
@@ -400,7 +398,8 @@ func doWithRetry(buildReq func() (*http.Request, error)) (*http.Response, error)
 	var lastErr error
 	for attempt := 0; attempt <= maxRetries; attempt++ {
 		if attempt > 0 {
-			time.Sleep(retryDelay)
+			delay := retryDelay * time.Duration(1<<(attempt-1))
+			time.Sleep(delay)
 		}
 		req, err := buildReq()
 		if err != nil {
@@ -411,7 +410,7 @@ func doWithRetry(buildReq func() (*http.Request, error)) (*http.Response, error)
 			lastErr = err
 			continue
 		}
-		if res.StatusCode >= 500 {
+		if res.StatusCode == 429 || res.StatusCode >= 500 {
 			_ = res.Body.Close()
 			lastErr = fmt.Errorf("server error: %s", res.Status)
 			continue

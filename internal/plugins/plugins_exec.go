@@ -108,11 +108,6 @@ func buildPowerShellFunctionScript(profilePaths []string, functionName string, a
 	return strings.Join(lines, "\n") + "\n"
 }
 
-func runPowerShellFunction(profilePaths []string, functionName string, args []string) error {
-	_, err := runPowerShellFunctionCapture(profilePaths, functionName, args)
-	return err
-}
-
 func runPowerShellFunctionCapture(profilePaths []string, functionName string, args []string) (string, error) {
 	ps := firstAvailableBinary("pwsh", "powershell")
 	if ps == "" {
@@ -141,11 +136,6 @@ func runPowerShellFunctionCapture(profilePaths []string, functionName string, ar
 		return output.String(), &RunError{Err: err, Output: output.String()}
 	}
 	return output.String(), nil
-}
-
-func execPlugin(path string, args []string) error {
-	_, err := execPluginCapture(path, args)
-	return err
 }
 
 func execPluginCapture(path string, args []string) (string, error) {

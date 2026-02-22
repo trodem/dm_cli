@@ -10,10 +10,14 @@ import (
 	"cli/internal/ui"
 )
 
-type toolMenuItem struct {
-	Key      string
-	Name     string
-	Synopsis string
+type ToolDescriptor struct {
+	Key       string
+	Name      string
+	Synopsis  string
+	Aliases   []string
+	AgentArgs string
+	RiskLevel string
+	RiskNote  string
 }
 
 type AutoRunResult struct {
@@ -23,13 +27,13 @@ type AutoRunResult struct {
 	ContinueParams map[string]string
 }
 
-var toolMenuItems = []toolMenuItem{
-	{Key: "s", Name: "search", Synopsis: "Search files by name/extension"},
-	{Key: "r", Name: "rename", Synopsis: "Batch rename files with preview"},
-	{Key: "e", Name: "recent", Synopsis: "Show recent files"},
-	{Key: "b", Name: "backup", Synopsis: "Create a folder zip backup"},
-	{Key: "c", Name: "clean", Synopsis: "Delete empty folders"},
-	{Key: "y", Name: "system", Synopsis: "Show system/network snapshot"},
+var ToolRegistry = []ToolDescriptor{
+	{Key: "s", Name: "search", Synopsis: "Search files by name/extension", Aliases: []string{"s"}, AgentArgs: "base, ext, name, sort, limit, offset", RiskLevel: "low", RiskNote: "read/inspect operation"},
+	{Key: "r", Name: "rename", Synopsis: "Batch rename files with preview", Aliases: []string{"r"}, AgentArgs: "base, from, to, name, case_sensitive", RiskLevel: "medium", RiskNote: "batch rename files"},
+	{Key: "e", Name: "recent", Synopsis: "Show recent files", Aliases: []string{"rec"}, AgentArgs: "base, limit, offset", RiskLevel: "low", RiskNote: "read/inspect operation"},
+	{Key: "b", Name: "backup", Synopsis: "Create a folder zip backup", Aliases: []string{"b"}, AgentArgs: "source, output", RiskLevel: "medium", RiskNote: "writes backup archive"},
+	{Key: "c", Name: "clean", Synopsis: "Delete empty folders", Aliases: []string{"c"}, AgentArgs: "base, apply (true for delete, otherwise preview)", RiskLevel: "low", RiskNote: "preview only"},
+	{Key: "y", Name: "system", Synopsis: "Show system/network snapshot", Aliases: []string{"sys", "htop"}, AgentArgs: "", RiskLevel: "low", RiskNote: "read/inspect operation"},
 }
 
 func RunMenu(baseDir string) int {
@@ -37,7 +41,7 @@ func RunMenu(baseDir string) int {
 
 	for {
 		ui.PrintSection("Tools")
-		for i, item := range toolMenuItems {
+		for i, item := range ToolRegistry {
 			fmt.Printf("%2d) [%s] %s %s\n", i+1, ui.Warn(item.Key), ui.Accent(item.Name), ui.Muted("- "+item.Synopsis))
 		}
 		fmt.Println(" 0) " + ui.Error("[x] Exit"))
@@ -52,23 +56,23 @@ func RunMenu(baseDir string) int {
 		default:
 			if strings.HasPrefix(lc, "h ") {
 				target := strings.TrimSpace(choice[2:])
-				idx, ok := parseToolMenuChoice(target, len(toolMenuItems))
+				idx, ok := parseToolMenuChoice(target, len(ToolRegistry))
 				if !ok {
 					fmt.Println(ui.Error("Invalid help selection."))
 					continue
 				}
-				item := toolMenuItems[idx]
+				item := ToolRegistry[idx]
 				fmt.Println(ui.Accent("Tool:"), item.Name)
 				fmt.Println(ui.Accent("Summary:"), item.Synopsis)
 				waitForEnter(reader)
 				continue
 			}
-			idx, ok := parseToolMenuChoice(choice, len(toolMenuItems))
+			idx, ok := parseToolMenuChoice(choice, len(ToolRegistry))
 			if !ok {
 				fmt.Println(ui.Error("Invalid selection."))
 				continue
 			}
-			_ = RunByNameWithReader(baseDir, toolMenuItems[idx].Name, reader)
+			_ = RunByNameWithReader(baseDir, ToolRegistry[idx].Name, reader)
 			waitForEnter(reader)
 		}
 	}
@@ -123,26 +127,18 @@ func RunByNameWithReader(baseDir, name string, reader *bufio.Reader) int {
 }
 
 func normalizeToolName(name string) string {
-	switch strings.ToLower(strings.TrimSpace(name)) {
-	case "1", "search", "s":
-		return "search"
-	case "2", "rename", "r":
-		return "rename"
-	case "3", "recent", "rec":
-		return "recent"
-	case "e":
-		return "recent"
-	case "4", "backup", "b":
-		return "backup"
-	case "5", "clean", "c":
-		return "clean"
-	case "6", "system", "sys", "htop":
-		return "system"
-	case "y":
-		return "system"
-	default:
-		return ""
+	lc := strings.ToLower(strings.TrimSpace(name))
+	for i, t := range ToolRegistry {
+		if lc == t.Name || lc == t.Key || lc == fmt.Sprintf("%d", i+1) {
+			return t.Name
+		}
+		for _, alias := range t.Aliases {
+			if lc == strings.ToLower(alias) {
+				return t.Name
+			}
+		}
 	}
+	return ""
 }
 
 func parseToolMenuChoice(choice string, count int) (int, bool) {
@@ -168,14 +164,14 @@ func parseToolMenuChoice(choice string, count int) (int, bool) {
 	}
 	// letter
 	if len(v) == 1 {
-		for i, item := range toolMenuItems {
+		for i, item := range ToolRegistry {
 			if item.Key == v {
 				return i, true
 			}
 		}
 	}
 	// direct name
-	for i, item := range toolMenuItems {
+	for i, item := range ToolRegistry {
 		if item.Name == v {
 			return i, true
 		}
@@ -225,6 +221,41 @@ func normalizeInputPath(raw, fallback string) string {
 		p = "."
 	}
 	return filepath.Clean(p)
+}
+
+func IsKnownTool(name string) bool {
+	return normalizeToolName(name) != ""
+}
+
+func BuildAgentCatalog() string {
+	lines := make([]string, 0, len(ToolRegistry))
+	for _, t := range ToolRegistry {
+		line := "- " + t.Name + ": " + t.Synopsis
+		if t.AgentArgs != "" {
+			line += " | tool_args: " + t.AgentArgs
+		} else {
+			line += " (no args needed)"
+		}
+		lines = append(lines, line)
+	}
+	return strings.Join(lines, "\n")
+}
+
+func ToolRisk(name string, args map[string]string) (string, string) {
+	canonical := normalizeToolName(name)
+	for _, t := range ToolRegistry {
+		if t.Name != canonical {
+			continue
+		}
+		if t.Name == "clean" {
+			apply := strings.ToLower(strings.TrimSpace(args["apply"]))
+			if apply == "1" || apply == "true" || apply == "yes" || apply == "y" {
+				return "high", "delete empty directories"
+			}
+		}
+		return t.RiskLevel, t.RiskNote
+	}
+	return "low", "read/inspect operation"
 }
 
 func validateExistingDir(path, label string) error {

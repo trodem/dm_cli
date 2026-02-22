@@ -2,15 +2,10 @@ package app
 
 import (
 	"bufio"
-	"crypto/sha256"
-	"encoding/hex"
 	"fmt"
 	"os"
 	"path/filepath"
-	"regexp"
-	"sort"
 	"strings"
-	"sync"
 	"time"
 
 	"cli/internal/agent"
@@ -31,51 +26,6 @@ const (
 	riskPolicyOff    = "off"
 )
 
-type decisionCacheEntry struct {
-	at    time.Time
-	value agent.DecisionResult
-}
-
-type decisionCacheStore struct {
-	mu    sync.RWMutex
-	ttl   time.Duration
-	items map[string]decisionCacheEntry
-}
-
-func newDecisionCacheStore(ttl time.Duration) *decisionCacheStore {
-	return &decisionCacheStore{
-		ttl:   ttl,
-		items: map[string]decisionCacheEntry{},
-	}
-}
-
-func (c *decisionCacheStore) Get(key string, now time.Time) (agent.DecisionResult, bool) {
-	c.mu.RLock()
-	entry, ok := c.items[key]
-	c.mu.RUnlock()
-	if !ok {
-		return agent.DecisionResult{}, false
-	}
-	if now.Sub(entry.at) > c.ttl {
-		c.mu.Lock()
-		delete(c.items, key)
-		c.mu.Unlock()
-		return agent.DecisionResult{}, false
-	}
-	return entry.value, true
-}
-
-func (c *decisionCacheStore) Set(key string, value agent.DecisionResult, now time.Time) {
-	c.mu.Lock()
-	c.items[key] = decisionCacheEntry{
-		at:    now,
-		value: value,
-	}
-	c.mu.Unlock()
-}
-
-var askDecisionCache = newDecisionCacheStore(askDecisionCacheTTL)
-
 type askActionRecord struct {
 	Step   int
 	Action string
@@ -83,8 +33,6 @@ type askActionRecord struct {
 	Args   string
 	Result string
 }
-
-
 
 type askSessionParams struct {
 	baseDir         string
@@ -520,34 +468,6 @@ func buildAskPlannerPrompt(original string, history []askActionRecord, previousP
 	return strings.Join(lines, "\n")
 }
 
-func decideWithCache(prompt, pluginCatalog, toolCatalog string, opts agent.AskOptions, envContext string) (agent.DecisionResult, bool, error) {
-	key := decisionCacheKey(prompt, pluginCatalog, toolCatalog, opts, envContext)
-	now := time.Now()
-	if cached, ok := askDecisionCache.Get(key, now); ok {
-		return cached, true, nil
-	}
-	decision, err := agent.DecideWithPlugins(prompt, pluginCatalog, toolCatalog, opts, envContext)
-	if err != nil {
-		return agent.DecisionResult{}, false, err
-	}
-	askDecisionCache.Set(key, decision, now)
-	return decision, false, nil
-}
-
-func decisionCacheKey(prompt, pluginCatalog, toolCatalog string, opts agent.AskOptions, envContext string) string {
-	normalized := strings.Join([]string{
-		strings.TrimSpace(prompt),
-		strings.TrimSpace(pluginCatalog),
-		strings.TrimSpace(toolCatalog),
-		strings.ToLower(strings.TrimSpace(opts.Provider)),
-		strings.TrimSpace(opts.Model),
-		strings.TrimSpace(opts.BaseURL),
-		strings.TrimSpace(envContext),
-	}, "\n---\n")
-	sum := sha256.Sum256([]byte(normalized))
-	return hex.EncodeToString(sum[:])
-}
-
 func buildEnvContext() string {
 	cwd, err := os.Getwd()
 	if err != nil {
@@ -576,7 +496,7 @@ func decisionSignature(decision agent.DecisionResult) string {
 func runAskInteractiveWithRisk(baseDir string, opts agent.AskOptions, confirmTools bool, riskPolicy string, initialPrompt string) int {
 	session, err := agent.ResolveSessionProvider(opts)
 	if err != nil {
-		fmt.Println("Error:", err)
+		fmt.Fprintln(os.Stderr, "Error:", err)
 		return 1
 	}
 	sessionOpts := session.Options
@@ -623,292 +543,5 @@ func runAskInteractiveWithRisk(baseDir string, opts agent.AskOptions, confirmToo
 		if len(previousPrompts) > askPreviousPromptsMax {
 			previousPrompts = previousPrompts[len(previousPrompts)-askPreviousPromptsMax:]
 		}
-	}
-}
-
-func normalizeRiskPolicy(raw string) (string, error) {
-	p := strings.ToLower(strings.TrimSpace(raw))
-	switch p {
-	case "", riskPolicyNormal:
-		return riskPolicyNormal, nil
-	case riskPolicyStrict, riskPolicyOff:
-		return p, nil
-	default:
-		return "", fmt.Errorf("invalid --risk-policy %q (use strict|normal|off)", raw)
-	}
-}
-
-func shouldConfirmAction(confirmTools bool, riskPolicy, risk string) bool {
-	switch riskPolicy {
-	case riskPolicyOff:
-		return confirmTools
-	case riskPolicyStrict:
-		return true
-	default:
-		return confirmTools || risk == "high"
-	}
-}
-
-func confirmAgentAction(reader *bufio.Reader, risk string) bool {
-	if risk == "high" {
-		fmt.Print(ui.Prompt("Confirm HIGH risk action? [y/N]: "))
-		confirm := strings.ToLower(strings.TrimSpace(readLine(reader)))
-		return confirm == "y" || confirm == "yes"
-	}
-	fmt.Print(ui.Prompt("Confirm agent action? [Y/n]: "))
-	confirm := strings.ToLower(strings.TrimSpace(readLine(reader)))
-	return !(confirm == "n" || confirm == "no")
-}
-
-func assessDecisionRisk(decision agent.DecisionResult) (string, string) {
-	if decision.Action == "run_tool" {
-		tool := strings.ToLower(strings.TrimSpace(decision.Tool))
-		switch tool {
-		case "clean", "c":
-			apply := strings.ToLower(strings.TrimSpace(decision.ToolArgs["apply"]))
-			if apply == "1" || apply == "true" || apply == "yes" || apply == "y" {
-				return "high", "delete empty directories"
-			}
-			return "low", "preview only"
-		case "rename", "r":
-			return "medium", "batch rename files"
-		case "backup", "b":
-			return "medium", "writes backup archive"
-		default:
-			return "low", "read/inspect operation"
-		}
-	}
-	if decision.Action == "run_plugin" {
-		name := strings.ToLower(strings.TrimSpace(decision.Plugin))
-		if strings.Contains(name, "reset") || strings.Contains(name, "delete") || strings.Contains(name, "drop") || strings.Contains(name, "rm") {
-			return "high", "plugin may perform destructive operations"
-		}
-		return "medium", "external plugin execution"
-	}
-	return "low", "response only"
-}
-
-func buildPluginCatalog(baseDir string) string {
-	items, err := plugins.ListEntries(baseDir, true)
-	if err != nil || len(items) == 0 {
-		return "(none)"
-	}
-
-	type catalogEntry struct {
-		item plugins.Entry
-		line string
-	}
-
-	groups := map[string][]catalogEntry{}
-	groupOrder := []string{}
-
-	for _, item := range items {
-		info, _ := plugins.GetInfo(baseDir, item.Name)
-		line := fmt.Sprintf("- %s", item.Name)
-		if strings.TrimSpace(info.Synopsis) != "" {
-			line += ": " + info.Synopsis
-		}
-		if len(info.ParamDetails) > 0 {
-			line += " | params: " + formatParamDetailsForCatalog(info.ParamDetails)
-		} else if len(info.Parameters) > 0 {
-			line += " | params: " + strings.Join(info.Parameters, "; ")
-		}
-
-		key := toolkitGroupKey(item.Path)
-		if _, exists := groups[key]; !exists {
-			groupOrder = append(groupOrder, key)
-		}
-		groups[key] = append(groups[key], catalogEntry{item: item, line: line})
-	}
-
-	sort.Strings(groupOrder)
-
-	var out []string
-	for _, key := range groupOrder {
-		label := toolkitLabel(key)
-		out = append(out, fmt.Sprintf("\n[%s]", label))
-		for _, entry := range groups[key] {
-			out = append(out, entry.line)
-		}
-	}
-	return strings.Join(out, "\n")
-}
-
-func toolkitGroupKey(filePath string) string {
-	normalized := strings.ReplaceAll(filePath, "\\", "/")
-	base := filepath.Base(normalized)
-	ext := filepath.Ext(base)
-	return strings.TrimSuffix(base, ext)
-}
-
-func toolkitLabel(groupKey string) string {
-	name := groupKey
-	if len(name) >= 2 && name[0] >= '0' && name[0] <= '9' && name[1] == '_' {
-		name = name[2:]
-	}
-	name = strings.TrimSuffix(name, "_Toolkit")
-	return strings.ReplaceAll(name, "_", " ")
-}
-
-func formatParamDetailsForCatalog(details []plugins.ParamDetail) string {
-	parts := make([]string, 0, len(details))
-	for _, d := range details {
-		s := d.Name
-		if d.Switch {
-			s += " [switch]"
-		} else if d.Type != "" {
-			s += " [" + d.Type + "]"
-		}
-		if d.Mandatory {
-			s += " (required)"
-		}
-		if len(d.ValidateSet) > 0 {
-			s += " values=" + strings.Join(d.ValidateSet, "|")
-		}
-		if d.Default != "" {
-			s += " default=" + d.Default
-		}
-		parts = append(parts, s)
-	}
-	return strings.Join(parts, "; ")
-}
-
-func buildToolsCatalog() string {
-	return strings.Join([]string{
-		"- search: Search files by name/extension | tool_args: base, ext, name, sort, limit, offset",
-		"- rename: Batch rename files with preview | tool_args: base, from, to, name, case_sensitive",
-		"- recent: Show recent files | tool_args: base, limit, offset",
-		"- backup: Create a folder zip backup | tool_args: source, output",
-		"- clean: Delete empty folders | tool_args: base, apply (true for delete, otherwise preview)",
-		"- system: Show system/network snapshot (no args needed)",
-	}, "\n")
-}
-
-func isKnownTool(name string) bool {
-	switch strings.ToLower(strings.TrimSpace(name)) {
-	case "search", "s", "rename", "r", "recent", "rec", "backup", "b", "clean", "c", "system", "sys", "htop":
-		return true
-	default:
-		return false
-	}
-}
-
-func pluginArgsToPS(pluginArgs map[string]string) []string {
-	if len(pluginArgs) == 0 {
-		return nil
-	}
-	keys := make([]string, 0, len(pluginArgs))
-	for k := range pluginArgs {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-
-	var args []string
-	for _, k := range keys {
-		v := strings.TrimSpace(pluginArgs[k])
-		paramName := k
-		if !strings.HasPrefix(paramName, "-") {
-			paramName = "-" + paramName
-		}
-		lv := strings.ToLower(v)
-		if lv == "true" || lv == "" {
-			args = append(args, paramName)
-			continue
-		}
-		if lv == "false" {
-			continue
-		}
-		args = append(args, paramName, v)
-	}
-	return args
-}
-
-func formatPluginArgs(pluginArgs map[string]string) string {
-	if len(pluginArgs) == 0 {
-		return ""
-	}
-	keys := make([]string, 0, len(pluginArgs))
-	for k := range pluginArgs {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-	parts := make([]string, 0, len(keys))
-	for _, k := range keys {
-		parts = append(parts, fmt.Sprintf("-%s %s", k, pluginArgs[k]))
-	}
-	return strings.Join(parts, " ")
-}
-
-func formatToolArgs(args map[string]string) string {
-	if len(args) == 0 {
-		return ""
-	}
-	keys := make([]string, 0, len(args))
-	for k := range args {
-		v := strings.TrimSpace(args[k])
-		lc := strings.ToLower(v)
-		if v == "" || lc == "<nil>" || lc == "null" {
-			continue
-		}
-		keys = append(keys, k)
-	}
-	if len(keys) == 0 {
-		return ""
-	}
-	sort.Strings(keys)
-	parts := make([]string, 0, len(keys))
-	for _, k := range keys {
-		parts = append(parts, fmt.Sprintf("%s=%s", k, args[k]))
-	}
-	return strings.Join(parts, ", ")
-}
-
-func plannedActionSummary(decision agent.DecisionResult) string {
-	switch strings.ToLower(strings.TrimSpace(decision.Action)) {
-	case "run_plugin":
-		s := "plugin " + strings.TrimSpace(decision.Plugin)
-		if a := formatPluginArgs(decision.PluginArgs); a != "" {
-			s += " " + a
-		} else if len(decision.Args) > 0 {
-			s += " " + strings.Join(decision.Args, " ")
-		}
-		return s
-	case "run_tool":
-		s := "tool " + strings.TrimSpace(decision.Tool)
-		if args := formatToolArgs(decision.ToolArgs); strings.TrimSpace(args) != "" {
-			s += " (" + args + ")"
-		}
-		return s
-	case "create_function":
-		desc := strings.TrimSpace(decision.FunctionDescription)
-		if len(desc) > askDescMaxLen {
-			desc = desc[:askDescMaxLen] + "..."
-		}
-		return "create function: " + desc
-	default:
-		if strings.TrimSpace(decision.Answer) != "" {
-			return "answer"
-		}
-		return "noop"
-	}
-}
-
-var missingPathErr = regexp.MustCompile(`(?i)required path '([^']+)' does not exist`)
-
-func truncateForHistory(s string, maxLen int) string {
-	s = strings.TrimSpace(s)
-	if len(s) <= maxLen {
-		return s
-	}
-	return s[:maxLen] + "\n... (truncated)"
-}
-
-func printAgentActionError(err error) {
-	fmt.Println("Error:", err)
-	combined := strings.TrimSpace(err.Error() + "\n" + plugins.ErrorOutput(err))
-	m := missingPathErr.FindStringSubmatch(combined)
-	if len(m) == 2 {
-		fmt.Println(ui.Warn("Missing required path: " + m[1]))
-		fmt.Println(ui.Muted("Fix the path in plugin variables/config, then retry."))
 	}
 }

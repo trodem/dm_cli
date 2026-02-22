@@ -214,13 +214,13 @@ func TestPlannedActionSummaryPluginArgs(t *testing.T) {
 }
 
 func TestIsKnownTool(t *testing.T) {
-	known := []string{"search", "s", "rename", "r", "recent", "rec", "backup", "b", "clean", "c", "system", "sys", "htop"}
+	known := []string{"search", "s", "rename", "r", "recent", "rec", "backup", "b", "clean", "c", "system", "sys", "htop", "e", "y"}
 	for _, name := range known {
 		if !isKnownTool(name) {
 			t.Fatalf("expected %q to be a known tool", name)
 		}
 	}
-	unknown := []string{"e", "y", "foo", "1", ""}
+	unknown := []string{"foo", ""}
 	for _, name := range unknown {
 		if isKnownTool(name) {
 			t.Fatalf("expected %q to NOT be a known tool", name)

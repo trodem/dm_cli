@@ -15,13 +15,13 @@ func runPluginOrSuggest(baseDir string, args []string) int {
 	}
 	if err := plugins.Run(baseDir, args[0], args[1:]); err != nil {
 		if plugins.IsNotFound(err) {
-			fmt.Println("Error:", err)
+			fmt.Fprintln(os.Stderr, "Error:", err)
 			if suggestion := suggestTopLevelName(baseDir, args[0]); suggestion != "" {
-				fmt.Printf("Did you mean: dm %s\n", suggestion)
+				fmt.Fprintf(os.Stderr, "Did you mean: dm %s\n", suggestion)
 			}
 			return 1
 		}
-		fmt.Println("Error:", err)
+		fmt.Fprintln(os.Stderr, "Error:", err)
 		return 1
 	}
 	return 0
@@ -99,7 +99,7 @@ func runPlugin(baseDir string, args []string) int {
 		}
 		items, err := plugins.ListEntries(baseDir, includeFunctions)
 		if err != nil {
-			fmt.Println("Error:", err)
+			fmt.Fprintln(os.Stderr, "Error:", err)
 			return 1
 		}
 		if len(items) == 0 {
@@ -125,7 +125,7 @@ func runPlugin(baseDir string, args []string) int {
 		}
 		info, err := plugins.GetInfo(baseDir, args[1])
 		if err != nil {
-			fmt.Println("Error:", err)
+			fmt.Fprintln(os.Stderr, "Error:", err)
 			return 1
 		}
 		fmt.Println("Name      :", info.Name)
@@ -160,7 +160,7 @@ func runPlugin(baseDir string, args []string) int {
 			return 0
 		}
 		if err := plugins.Run(baseDir, args[1], args[2:]); err != nil {
-			fmt.Println("Error:", err)
+			fmt.Fprintln(os.Stderr, "Error:", err)
 			return 1
 		}
 		return 0
@@ -224,40 +224,32 @@ func editDistance(a, b string) int {
 	if a == b {
 		return 0
 	}
-	if len(a) == 0 {
-		return len(b)
+	ra := []rune(a)
+	rb := []rune(b)
+	if len(ra) == 0 {
+		return len(rb)
 	}
-	if len(b) == 0 {
-		return len(a)
+	if len(rb) == 0 {
+		return len(ra)
 	}
-	prev := make([]int, len(b)+1)
-	cur := make([]int, len(b)+1)
-	for j := 0; j <= len(b); j++ {
+	prev := make([]int, len(rb)+1)
+	cur := make([]int, len(rb)+1)
+	for j := 0; j <= len(rb); j++ {
 		prev[j] = j
 	}
-	for i := 1; i <= len(a); i++ {
+	for i := 1; i <= len(ra); i++ {
 		cur[0] = i
-		for j := 1; j <= len(b); j++ {
+		for j := 1; j <= len(rb); j++ {
 			cost := 0
-			if a[i-1] != b[j-1] {
+			if ra[i-1] != rb[j-1] {
 				cost = 1
 			}
 			del := prev[j] + 1
 			ins := cur[j-1] + 1
 			sub := prev[j-1] + cost
-			cur[j] = min3(del, ins, sub)
+			cur[j] = min(del, ins, sub)
 		}
 		prev, cur = cur, prev
 	}
-	return prev[len(b)]
-}
-
-func min3(a, b, c int) int {
-	if a <= b && a <= c {
-		return a
-	}
-	if b <= a && b <= c {
-		return b
-	}
-	return c
+	return prev[len(rb)]
 }

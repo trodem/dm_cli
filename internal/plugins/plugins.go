@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"regexp"
+
 	"sort"
 	"strings"
 )
@@ -62,8 +62,6 @@ func (e *RunError) Unwrap() error {
 }
 
 var ErrNotFound = errors.New("plugin not found")
-var psFunctionLine = regexp.MustCompile(`(?i)^\s*function\s+([a-z0-9_-]+)\b`)
-var psNamedTag = regexp.MustCompile(`(?i)^\.(synopsis|description|example|parameter)\b(?:\s+([a-z0-9_-]+))?\s*$`)
 
 type RunResult struct {
 	Output string

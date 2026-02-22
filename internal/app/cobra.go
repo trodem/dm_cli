@@ -3,6 +3,7 @@ package app
 import (
 	"errors"
 	"fmt"
+	"os"
 	"strings"
 
 	"cli/internal/ui"
@@ -64,20 +65,20 @@ func Run(args []string) int {
 		if strings.HasPrefix(msg, "unknown help topic") {
 			rest := parseFlags(rewriteGroupShortcuts(args))
 			if len(rest) >= 2 && rest[0] == "help" {
-				rt, loadErr := loadRuntime()
-				if loadErr != nil {
-					fmt.Println("Error:", loadErr)
-					return 1
-				}
-				return runPlugin(rt.BaseDir, []string{"info", rest[1]})
-			}
-		}
-		if strings.HasPrefix(msg, "unknown command") {
 			rt, loadErr := loadRuntime()
 			if loadErr != nil {
-				fmt.Println("Error:", loadErr)
+				fmt.Fprintln(os.Stderr, "Error:", loadErr)
 				return 1
 			}
+			return runPlugin(rt.BaseDir, []string{"info", rest[1]})
+		}
+	}
+	if strings.HasPrefix(msg, "unknown command") {
+		rt, loadErr := loadRuntime()
+		if loadErr != nil {
+			fmt.Fprintln(os.Stderr, "Error:", loadErr)
+			return 1
+		}
 			rest := parseFlags(rewriteGroupShortcuts(args))
 			if len(rest) > 0 && rest[0] == "$profile" {
 				return showPowerShellSymbols(resolveUserPowerShellProfilePath(), "$PROFILE")
@@ -85,7 +86,7 @@ func Run(args []string) int {
 			return runPluginOrSuggest(rt.BaseDir, rest)
 		}
 		if msg != "" {
-			fmt.Println("Error:", msg)
+			fmt.Fprintln(os.Stderr, "Error:", msg)
 		}
 		return 1
 	}
