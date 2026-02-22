@@ -14,26 +14,42 @@ type SplashData struct {
 
 func PrintSplash(d SplashData) {
 	fmt.Println(Accent(strings.TrimRight(logoText, "\n")))
-	fmt.Println(Accent("dm - Demtrodev CLI"))
 	fmt.Println()
-	fmt.Println(Accent("Workspace"))
-	fmt.Println(Muted("---------"))
-	fmt.Printf("%s %s\n", Muted("Base dir   :"), d.BaseDir)
-	fmt.Printf("%s %s\n", Muted("Version    :"), d.Version)
-	if strings.TrimSpace(d.ExeBuiltAt) != "" {
-		fmt.Printf("%s %s\n", Muted("Exe built  :"), d.ExeBuiltAt)
+
+	ver := d.Version
+	if ver == "" {
+		ver = "dev"
 	}
+	meta := ver
+	if strings.TrimSpace(d.ExeBuiltAt) != "" {
+		meta += Muted("  built " + d.ExeBuiltAt)
+	}
+	fmt.Println("  " + meta)
+	fmt.Println("  " + Muted(d.BaseDir))
 	fmt.Println()
-	fmt.Println(Accent("Quick Start"))
-	fmt.Println(Muted("-----------"))
-	fmt.Println(Prompt("dm -t or dm tools") + Muted("       Tools menu"))
-	fmt.Println(Prompt("dm -p or dm plugins") + Muted("     Plugin menu"))
-	fmt.Println(Prompt("dm ask") + Muted("                  Agent ask mode"))
-	fmt.Println(Prompt("dm doctor") + Muted("               Runtime diagnostics"))
-	fmt.Println(Muted("-----------"))
-	fmt.Println(Prompt("dm -o ps_profile") + Muted("        open $PROFILE in Notepad"))
-	fmt.Println(Prompt("dm ps_profile") + Muted("           List functions/aliases from $PROFILE"))
-	fmt.Println(Prompt("dm completion install"))
+
+	fmt.Println("  " + Accent("Commands"))
+	printCmd("dm ask", "AI agent (chat, plugins, tools)")
+	printCmd("dm ask -f <file>", "AI agent with file context")
+	printCmd("dm tools", "Interactive tools menu")
+	printCmd("dm plugins", "Plugin browser & runner")
+	printCmd("dm doctor", "Runtime diagnostics")
+	fmt.Println()
+
+	fmt.Println("  " + Accent("Shortcuts"))
+	printCmd("dm -t", "tools")
+	printCmd("dm -p", "plugins")
+	printCmd("dm -o ps_profile", "open $PROFILE")
+	fmt.Println()
+	fmt.Println("  " + Muted("Run dm <command> --help for details"))
+}
+
+func printCmd(cmd, desc string) {
+	pad := 24 - len(cmd)
+	if pad < 2 {
+		pad = 2
+	}
+	fmt.Printf("  %s%s%s\n", Prompt(cmd), strings.Repeat(" ", pad), Muted(desc))
 }
 
 //go:embed logo.txt
