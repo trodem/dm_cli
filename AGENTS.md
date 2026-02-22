@@ -16,7 +16,8 @@ Repository guidelines for automated agents.
   - `ask.go` — main agent loop and action handlers (run_plugin, run_tool, create_function, answer)
   - `ask_cache.go` — decision cache (deduplicates identical agent requests)
   - `ask_catalog.go` — builds plugin and tool catalogs for the agent prompt
-  - `ask_helpers.go` — argument formatting, display helpers, mandatory-param pre-check, token budget trimming
+  - `ask_helpers.go` — argument formatting, display helpers, mandatory-param pre-check, token budget trimming, file context builder
+  - `ask_stream.go` — streaming answer buffering with markdown post-processing
   - `ask_risk.go` — risk assessment, toolkit safety parsing, confirmation prompts
   - `ask_output.go` — TTY and JSON output renderers for agent responses (humanized step descriptions, risk display)
   - `ask_toolkit_writer.go` — file writing helpers for the toolkit builder (append function, update index, create new toolkit)
@@ -267,10 +268,14 @@ These mistakes have caused real bugs. Do not repeat them.
 - Write spinner frames to **stderr** (not stdout) to keep stdout pipe-clean.
 - Suppress spinner when stdout/stderr are not terminals (piped mode).
 - Final answer prints with a blank line before it for visual breathing room.
+- Apply markdown rendering (`ui.RenderMarkdown`) to all answer paths: direct, streamed, partial, error-with-answer, canceled, loop-detected.
+- Streamed answers buffer to `answerBuf` during streaming, then render markdown at completion via `Finish()`.
+- `--file` / `-f` flag attaches file contents as context to the LLM prompt (repeatable, max 32KB per file).
 
 ## Menu And Output Styling
 - Use shared color helpers from `internal/ui/pretty.go` (for example `Accent`, `Warn`, `Muted`, `Prompt`) for interactive menus.
 - Use `internal/ui/spinner.go` (`ui.NewSpinner`, `Start`, `Stop`) for progress indication during long operations.
+- Use `internal/ui/markdown.go` (`ui.RenderMarkdown`) to strip markdown syntax from LLM answers; always strips markers (`**`, `##`, `` ` ``, ` ``` `), adds ANSI styling only when color is supported.
 - Apply the same style across all interactive menus in the project (tools, target actions, plugin menu, and future menus).
 - Keep prompts colorized and explicit (for example `Select option >`, `Args (optional) >`).
 - Use `Prompt(...)` for user input questions, `Warn(...)` for cancellations, and `Error(...)` for invalid selections.

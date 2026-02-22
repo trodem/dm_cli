@@ -72,6 +72,7 @@ Flags:
 - `--base-url <url>`
 - `--confirm-tools` / `--no-confirm-tools`
 - `--risk-policy strict|normal|off`
+- `-f`, `--file <path>` (attach file as context, repeatable)
 - `--json` (structured output, one-shot mode only)
 - `--debug` (enable debug logging to stderr)
 
@@ -80,6 +81,8 @@ Examples:
 dm ask "spiegami questo errore"
 dm ask --provider auto "cerca i file pdf in Downloads"
 dm ask --json "trova file recenti in Downloads"
+dm ask -f config.json "analizza questo file"
+dm ask -f main.go -f go.mod "confronta questi file"
 ```
 
 Config path priority:
