@@ -29,6 +29,14 @@
 #   stibs_db_sample
 #   stibs_db_orphans
 #   stibs_db_doctor
+#   stibs_db_search
+#   stibs_db_recent
+#   stibs_db_processlist
+#   stibs_db_duplicates
+#   stibs_db_nulls
+#   stibs_db_size
+#   stibs_db_table_info
+#   stibs_db_relations
 # =============================================================================
 
 Set-StrictMode -Version Latest
@@ -247,10 +255,11 @@ function stibs_db_query {
     _assert_command_available -Name docker
     $cfg = _stibs_db_get_config
 
-    docker exec -i $($cfg.Container) `
-        mysql -u$($cfg.User) -p$($cfg.Password) $($cfg.Database) `
-        --batch --skip-column-names `
-        -e "$Sql"
+    $oneLine = ($Sql -replace '\r?\n', ' ').Trim()
+    $safeSql = $oneLine.Replace("'", "'\''")
+    $shCmd = "mysql --user='$($cfg.User)' --password='$($cfg.Password)' --database='$($cfg.Database)' --batch --skip-column-names -e '$safeSql'"
+
+    docker exec $($cfg.Container) sh -c "$shCmd"
 }
 
 <#
@@ -308,8 +317,10 @@ stibs_db_shell
 function stibs_db_shell {
     _assert_command_available -Name docker
     $cfg = _stibs_db_get_config
-    docker exec -it $($cfg.Container) `
-        mysql -u$($cfg.User) -p$($cfg.Password) $($cfg.Database)
+
+    $shCmd = "mysql --user='$($cfg.User)' --password='$($cfg.Password)' --database='$($cfg.Database)'"
+
+    docker exec -it $($cfg.Container) sh -c "$shCmd"
 }
 
 # -----------------------------------------------------------------------------
@@ -359,9 +370,9 @@ function stibs_db_export_dump {
     $cfg = _stibs_db_get_config
     $sqlFile = Join-Path $env:TEMP "$($cfg.Database)-$timestamp.sql"
 
-    docker exec $($cfg.Container) `
-        mysqldump --single-transaction --quick --lock-tables=false `
-        -u$($cfg.User) -p$($cfg.Password) $($cfg.Database) `
+    $dumpCmd = "mysqldump --single-transaction --quick --lock-tables=false --user='$($cfg.User)' --password='$($cfg.Password)' '$($cfg.Database)'"
+
+    docker exec $($cfg.Container) sh -c "$dumpCmd" `
         | Out-File -FilePath $sqlFile -Encoding utf8
 
     Compress-Archive -Path $sqlFile -DestinationPath $zipFile -Force
@@ -414,12 +425,15 @@ function stibs_db_import_dump {
     $cfg = _stibs_db_get_config
     $dbNameLiteral = _stibs_db_escape_sql_literal -Value $cfg.Database
 
-    docker exec $($cfg.Container) `
-        mysql -u$($cfg.User) -p$($cfg.Password) `
-        -e "DROP DATABASE IF EXISTS $dbNameLiteral; CREATE DATABASE $dbNameLiteral;"
+    $dropSql = "DROP DATABASE IF EXISTS $dbNameLiteral; CREATE DATABASE $dbNameLiteral;"
+    $safeDropSql = $dropSql.Replace("'", "'\''")
+    $dropCmd = "mysql --user='$($cfg.User)' --password='$($cfg.Password)' --batch -e '$safeDropSql'"
 
-    Get-Content $sqlFile.FullName -Raw | docker exec -i $($cfg.Container) `
-        mysql -u$($cfg.User) -p$($cfg.Password) $($cfg.Database)
+    docker exec $($cfg.Container) sh -c "$dropCmd"
+
+    $importCmd = "mysql --user='$($cfg.User)' --password='$($cfg.Password)' --database='$($cfg.Database)'"
+
+    Get-Content $sqlFile.FullName -Raw | docker exec -i $($cfg.Container) sh -c "$importCmd"
 
     Remove-Item $tempDir -Recurse -Force
 
@@ -762,4 +776,238 @@ function stibs_db_doctor {
         EmptyTables   = $empty
         LargestBySize = $largest
     }
+}
+
+# -----------------------------------------------------------------------------
+# Search & Inspection
+# -----------------------------------------------------------------------------
+
+<#
+.SYNOPSIS
+Search for a value across all columns of a table.
+.DESCRIPTION
+Builds a query that checks every column of the given table for a LIKE match
+against the search term. Useful for locating where a specific value appears.
+.PARAMETER Table
+Table name to search.
+.PARAMETER Value
+Substring to search for in all columns.
+.PARAMETER Limit
+Maximum rows to return (default 20, max 1000).
+.EXAMPLE
+stibs_db_search -Table user -Value "mario"
+.EXAMPLE
+stibs_db_search -Table defect -Value "timeout" -Limit 5
+#>
+function stibs_db_search {
+    param(
+        [Parameter(Mandatory = $true)][string]$Table,
+        [Parameter(Mandatory = $true)][string]$Value,
+        [int]$Limit = 20
+    )
+
+    $safeTable = _stibs_db_assert_identifier -Value $Table -Name "table"
+    $safeLimit = _stibs_db_assert_limit -Value $Limit -Default 20
+    $cfg = _stibs_db_get_config
+    $dbNameLiteral = _stibs_db_escape_sql_literal -Value $cfg.Database
+    $valueLike = _stibs_db_escape_like -Value $Value
+
+    $colSql = "SELECT column_name FROM information_schema.columns WHERE table_schema = '$dbNameLiteral' AND table_name = '$safeTable' ORDER BY ordinal_position;"
+    $columns = stibs_db_query -Sql $colSql
+    if (-not $columns) { throw "Table '$safeTable' not found or has no columns." }
+
+    $colList = @()
+    foreach ($c in ($columns -split "`n")) {
+        $col = $c.Trim()
+        if ($col -ne '') { $colList += $col }
+    }
+
+    $conditions = ($colList | ForEach-Object { "CAST(``$_`` AS CHAR) LIKE '%$valueLike%' ESCAPE '\\'" }) -join ' OR '
+    $searchSql = "SELECT * FROM $safeTable WHERE $conditions LIMIT $safeLimit;"
+
+    stibs_db_query -Sql $searchSql
+}
+
+<#
+.SYNOPSIS
+Show the most recently modified rows in a table.
+.DESCRIPTION
+Queries a table ordered by a timestamp column descending. Defaults to common
+column names (updated_at, created_at, createdAt, updatedAt) if Column is not specified.
+.PARAMETER Table
+Table name to query.
+.PARAMETER Column
+Timestamp column to sort by. Auto-detected if omitted.
+.PARAMETER Limit
+Number of rows to return (default 10, max 1000).
+.EXAMPLE
+stibs_db_recent -Table defect
+.EXAMPLE
+stibs_db_recent -Table project -Column createdAt -Limit 5
+#>
+function stibs_db_recent {
+    param(
+        [Parameter(Mandatory = $true)][string]$Table,
+        [string]$Column,
+        [int]$Limit = 10
+    )
+
+    $safeTable = _stibs_db_assert_identifier -Value $Table -Name "table"
+    $safeLimit = _stibs_db_assert_limit -Value $Limit -Default 10
+    $cfg = _stibs_db_get_config
+    $dbNameLiteral = _stibs_db_escape_sql_literal -Value $cfg.Database
+
+    if ([string]::IsNullOrWhiteSpace($Column)) {
+        $candidates = @('modifyDate', 'createDate', 'updated_at', 'created_at', 'updatedAt', 'createdAt', 'update_time', 'create_time')
+        $colSql = "SELECT column_name FROM information_schema.columns WHERE table_schema = '$dbNameLiteral' AND table_name = '$safeTable' ORDER BY ordinal_position;"
+        $allCols = stibs_db_query -Sql $colSql
+        if (-not $allCols) { throw "Table '$safeTable' not found or has no columns." }
+
+        $colLines = @()
+        foreach ($c in ($allCols -split "`n")) {
+            $t = $c.Trim()
+            if ($t -ne '') { $colLines += $t }
+        }
+
+        $Column = $null
+        foreach ($cand in $candidates) {
+            if ($colLines -contains $cand) { $Column = $cand; break }
+        }
+        if (-not $Column) { throw "No timestamp column found in '$safeTable'. Specify -Column explicitly." }
+    }
+
+    $safeColumn = _stibs_db_assert_identifier -Value $Column -Name "column"
+    stibs_db_query -Sql "SELECT * FROM $safeTable ORDER BY $safeColumn DESC LIMIT $safeLimit;"
+}
+
+<#
+.SYNOPSIS
+Show active connections and running queries in MariaDB.
+.EXAMPLE
+stibs_db_processlist
+#>
+function stibs_db_processlist {
+    stibs_db_query -Sql "SHOW FULL PROCESSLIST;"
+}
+
+<#
+.SYNOPSIS
+Find duplicate values in a specific column.
+.DESCRIPTION
+Returns each duplicated value along with its occurrence count, sorted by
+frequency descending.
+.PARAMETER Table
+Table name to inspect.
+.PARAMETER Column
+Column to check for duplicates.
+.PARAMETER Limit
+Maximum number of duplicate groups to return (default 20, max 1000).
+.EXAMPLE
+stibs_db_duplicates -Table user -Column email
+#>
+function stibs_db_duplicates {
+    param(
+        [Parameter(Mandatory = $true)][string]$Table,
+        [Parameter(Mandatory = $true)][string]$Column,
+        [int]$Limit = 20
+    )
+
+    $safeTable  = _stibs_db_assert_identifier -Value $Table  -Name "table"
+    $safeColumn = _stibs_db_assert_identifier -Value $Column -Name "column"
+    $safeLimit  = _stibs_db_assert_limit -Value $Limit -Default 20
+
+    stibs_db_query -Sql "SELECT ``$safeColumn``, COUNT(*) AS occurrences FROM $safeTable GROUP BY ``$safeColumn`` HAVING COUNT(*) > 1 ORDER BY occurrences DESC LIMIT $safeLimit;"
+}
+
+<#
+.SYNOPSIS
+Show NULL distribution for every column in a table.
+.DESCRIPTION
+For each column, returns the total row count, how many NULLs exist and the
+percentage of NULLs. Useful for assessing data completeness.
+.PARAMETER Table
+Table name to inspect.
+.EXAMPLE
+stibs_db_nulls -Table project
+#>
+function stibs_db_nulls {
+    param(
+        [Parameter(Mandatory = $true)][string]$Table
+    )
+
+    $safeTable = _stibs_db_assert_identifier -Value $Table -Name "table"
+    $cfg = _stibs_db_get_config
+    $dbNameLiteral = _stibs_db_escape_sql_literal -Value $cfg.Database
+
+    $colSql = "SELECT column_name FROM information_schema.columns WHERE table_schema = '$dbNameLiteral' AND table_name = '$safeTable' ORDER BY ordinal_position;"
+    $columns = stibs_db_query -Sql $colSql
+    if (-not $columns) { throw "Table '$safeTable' not found or has no columns." }
+
+    $colList = @()
+    foreach ($c in ($columns -split "`n")) {
+        $t = $c.Trim()
+        if ($t -ne '') { $colList += $t }
+    }
+
+    $selects = ($colList | ForEach-Object {
+        "SUM(CASE WHEN ``$_`` IS NULL THEN 1 ELSE 0 END) AS ``null_$_``"
+    }) -join ', '
+
+    stibs_db_query -Sql "SELECT COUNT(*) AS total_rows, $selects FROM $safeTable;"
+}
+
+<#
+.SYNOPSIS
+Show total database size on disk.
+.DESCRIPTION
+Returns the combined data and index size of all tables in the STIBS database,
+reported in megabytes.
+.EXAMPLE
+stibs_db_size
+#>
+function stibs_db_size {
+    $cfg = _stibs_db_get_config
+    $dbNameLiteral = _stibs_db_escape_sql_literal -Value $cfg.Database
+
+    stibs_db_query -Sql "SELECT ROUND(SUM(data_length + index_length) / 1024 / 1024, 2) AS size_mb FROM information_schema.tables WHERE table_schema = '$dbNameLiteral';"
+}
+
+<#
+.SYNOPSIS
+Show detailed metadata for a table.
+.DESCRIPTION
+Returns engine, row format, collation, auto-increment value, creation and
+update timestamps for the specified table.
+.PARAMETER Table
+Table name to inspect.
+.EXAMPLE
+stibs_db_table_info -Table project
+#>
+function stibs_db_table_info {
+    param(
+        [Parameter(Mandatory = $true)][string]$Table
+    )
+
+    $cfg = _stibs_db_get_config
+    $dbNameLiteral = _stibs_db_escape_sql_literal -Value $cfg.Database
+    $tableLiteral = _stibs_db_escape_sql_literal -Value $Table
+
+    stibs_db_query -Sql "SELECT table_name, engine, row_format, table_collation, auto_increment, table_rows, ROUND((data_length + index_length) / 1024 / 1024, 2) AS size_mb, create_time, update_time FROM information_schema.tables WHERE table_schema = '$dbNameLiteral' AND table_name = '$tableLiteral';"
+}
+
+<#
+.SYNOPSIS
+Show all foreign key relationships across the entire database.
+.DESCRIPTION
+Returns a full map of every foreign key constraint in the STIBS database,
+showing source table/column and referenced table/column. Unlike stibs_db_fk
+which filters by a single table, this shows the complete relationship graph.
+.EXAMPLE
+stibs_db_relations
+#>
+function stibs_db_relations {
+    $cfg = _stibs_db_get_config
+    $dbNameLiteral = _stibs_db_escape_sql_literal -Value $cfg.Database
+
+    stibs_db_query -Sql "SELECT constraint_name, table_name, column_name, referenced_table_name, referenced_column_name FROM information_schema.key_column_usage WHERE table_schema = '$dbNameLiteral' AND referenced_table_name IS NOT NULL ORDER BY table_name, column_name;"
 }

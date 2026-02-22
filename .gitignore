@@ -5,3 +5,5 @@ dist/*
 dm.agent.json
 .dm-gocache
 *.exe
+*_commit.bat
+*_commit_msg.txt
