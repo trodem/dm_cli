@@ -160,9 +160,21 @@ func handleRunPlugin(ctx askStepContext, decision agent.DecisionResult) (bool, i
 		ctx.out.Error("agent selected run_plugin without plugin name")
 		return false, 1
 	}
-	if _, err := plugins.GetInfo(ctx.baseDir, decision.Plugin); err != nil {
+	info, err := plugins.GetInfo(ctx.baseDir, decision.Plugin)
+	if err != nil {
 		ctx.out.ErrorWithAnswer("agent selected unknown plugin: "+decision.Plugin, decision.Answer)
 		return false, 1
+	}
+
+	if missing := missingMandatoryParams(info, decision.PluginArgs); len(missing) > 0 {
+		msg := fmt.Sprintf("plugin %s requires mandatory parameters: %s — include them in plugin_args",
+			decision.Plugin, strings.Join(missing, ", "))
+		*ctx.history = append(*ctx.history, askActionRecord{
+			Step: ctx.step, Action: "run_plugin", Target: decision.Plugin,
+			Args: formatPluginArgs(decision.PluginArgs),
+			Result: "error: " + msg,
+		})
+		return true, 0
 	}
 
 	var runArgs []string

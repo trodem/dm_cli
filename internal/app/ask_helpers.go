@@ -112,6 +112,26 @@ func plannedActionSummary(decision agent.DecisionResult) string {
 	}
 }
 
+func missingMandatoryParams(info plugins.Info, pluginArgs map[string]string) []string {
+	var missing []string
+	for _, p := range info.ParamDetails {
+		if !p.Mandatory {
+			continue
+		}
+		found := false
+		for k, v := range pluginArgs {
+			if strings.EqualFold(k, p.Name) && strings.TrimSpace(v) != "" {
+				found = true
+				break
+			}
+		}
+		if !found {
+			missing = append(missing, p.Name)
+		}
+	}
+	return missing
+}
+
 var missingPathErr = regexp.MustCompile(`(?i)required path '([^']+)' does not exist`)
 
 func truncateForHistory(s string, maxLen int) string {
