@@ -243,6 +243,8 @@ func buildDecisionSystemPrompt(pluginCatalog, toolCatalog string) string {
 		"7. Put your reasoning in the \"reason\" field.",
 		"",
 		"General rules:",
+		"- If answering the request requires live data you do not have (git changes, file contents, system state, etc.), run the appropriate tool FIRST; your output will appear in the action history so the next step can use it.",
+		"- When asked to write a commit message: always English, imperative mood, max 72 chars subject, focus on WHY not WHAT. Example: 'Add retry logic to HTTP client for transient failures'.",
 		"- action must be answer, run_plugin, run_tool, or create_function.",
 		"- Do not invent plugin or tool names; use only the catalog above.",
 		"- If the user request requires an operation that no existing plugin or tool can handle, return action=create_function.",
