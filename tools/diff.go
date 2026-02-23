@@ -35,10 +35,6 @@ func RunDiff(r *bufio.Reader) int {
 	}
 }
 
-func RunDiffAuto(baseDir string, params map[string]string) int {
-	return RunDiffAutoDetailed(baseDir, params).Code
-}
-
 func RunDiffAutoDetailed(baseDir string, params map[string]string) AutoRunResult {
 	mode := strings.ToLower(strings.TrimSpace(params["mode"]))
 	if mode == "" {

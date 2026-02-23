@@ -87,10 +87,6 @@ func RunByName(baseDir, name string) int {
 	return RunByNameWithReader(baseDir, name, bufio.NewReader(os.Stdin))
 }
 
-func RunByNameWithParams(baseDir, name string, params map[string]string) int {
-	return RunByNameWithParamsDetailed(baseDir, name, params).Code
-}
-
 func RunByNameWithParamsCapture(baseDir, name string, params map[string]string) AutoRunResult {
 	old := os.Stdout
 	r, w, err := os.Pipe()

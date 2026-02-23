@@ -1,0 +1,38 @@
+# dm CLI — Cursor Rules
+
+## Codebase Reference
+
+At the start of every session, read `docs/codebase.md` before exploring or searching the codebase.
+This file contains the tech stack, folder structure, data flow, entry points, and known technical debt.
+Use it to orient yourself and avoid redundant exploration.
+
+## Keeping codebase.md Up to Date
+
+After completing a task that changes the project structure, update the affected section(s) of `docs/codebase.md`.
+
+| Change type | Section to update |
+|-------------|-------------------|
+| New dependency added/removed in `go.mod` | **Tech Stack** |
+| New file, package, or directory created/deleted | **Folder Structure** (tree + file counts) |
+| New Cobra command or tool registered | **Entry Points** |
+| New plugin toolkit `.ps1` added | **Entry Points** (toolkit table) |
+| Architecture change (new data path, changed LLM flow, new dispatch) | **Data Flow** |
+| Bug fixed, debt resolved, or new debt introduced | **TODO / Debito Tecnico** |
+| Roadmap item completed or new item added | **TODO / Debito Tecnico** (roadmap table) |
+| Test file added to a previously uncovered package | **TODO / Debito Tecnico** (coverage gaps) |
+
+Do NOT update `docs/codebase.md` for:
+- Cosmetic changes (formatting, comments, variable renames)
+- Internal refactors that don't change the public API or structure
+- Minor bug fixes within existing functions
+
+Always update the "Aggiornato:" date at the top of `docs/codebase.md` when editing it.
+
+## Code Conventions
+
+- Go source lives in `internal/` (private) and `tools/` (built-in tools).
+- PowerShell toolkits live in `plugins/` and follow the naming convention `<Domain>_Toolkit.ps1`.
+- Every toolkit function must have a prefix matching the toolkit (e.g., `spo_*` for SharePoint).
+- Use `slog.Debug`/`slog.Warn` for agent-internal logging, `fmt.Print*` + `ui.*` for user output.
+- Run `go build ./...` and `go test ./...` after changes; fix any failures before committing.
+- Consult `AGENTS.md` for detailed PowerShell toolkit construction rules and agent decision engine specs.

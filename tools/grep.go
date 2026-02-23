@@ -15,11 +15,10 @@ import (
 )
 
 const (
-	grepDefaultLimit   = 20
-	grepMaxLimit       = 50
-	grepMaxFileBytes   = 1024 * 1024 // 1 MB
-	grepContextLines   = 0
-	grepMaxLineLen     = 500
+	grepDefaultLimit = 20
+	grepMaxLimit     = 50
+	grepMaxFileBytes = 1024 * 1024 // 1 MB
+	grepMaxLineLen   = 500
 )
 
 var grepSkipDirs = map[string]bool{
@@ -53,10 +52,6 @@ func RunGrep(r *bufio.Reader) int {
 	matches := grepFiles(base, pattern, ext, caseSensitive == "y" || caseSensitive == "yes", grepDefaultLimit)
 	printGrepResults(matches, pattern)
 	return 0
-}
-
-func RunGrepAuto(baseDir string, params map[string]string) int {
-	return RunGrepAutoDetailed(baseDir, params).Code
 }
 
 func RunGrepAutoDetailed(baseDir string, params map[string]string) AutoRunResult {

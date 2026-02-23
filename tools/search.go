@@ -61,10 +61,6 @@ func RunSearch(r *bufio.Reader) int {
 	return 0
 }
 
-func RunSearchAuto(baseDir string, params map[string]string) int {
-	return RunSearchAutoDetailed(baseDir, params).Code
-}
-
 func RunSearchAutoDetailed(baseDir string, params map[string]string) AutoRunResult {
 	base := strings.TrimSpace(params["base"])
 	if base == "" {

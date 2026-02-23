@@ -21,7 +21,6 @@ type askOutputWriter interface {
 	MaxStepsReached(answer string)
 	LoopDetected(answer string)
 	AddStep(step askJSONStep)
-	Finalize()
 }
 
 type askTTYWriter struct {
@@ -99,8 +98,6 @@ func (w *askTTYWriter) LoopDetected(answer string) {
 }
 
 func (w *askTTYWriter) AddStep(_ askJSONStep) {}
-
-func (w *askTTYWriter) Finalize() {}
 
 func humanizeSummary(summary string) string {
 	if strings.HasPrefix(summary, "plugin ") {
@@ -200,10 +197,6 @@ func (w *askJSONWriter) LoopDetected(answer string) {
 
 func (w *askJSONWriter) AddStep(step askJSONStep) {
 	w.result.Steps = append(w.result.Steps, step)
-}
-
-func (w *askJSONWriter) Finalize() {
-	w.emit()
 }
 
 func (w *askJSONWriter) emit() {

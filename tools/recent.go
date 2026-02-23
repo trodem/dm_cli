@@ -43,10 +43,6 @@ func RunRecent(r *bufio.Reader) int {
 	return code
 }
 
-func RunRecentAuto(baseDir string, params map[string]string) int {
-	return RunRecentAutoDetailed(baseDir, params).Code
-}
-
 func RunRecentAutoDetailed(baseDir string, params map[string]string) AutoRunResult {
 	base := strings.TrimSpace(params["base"])
 	if base == "" {

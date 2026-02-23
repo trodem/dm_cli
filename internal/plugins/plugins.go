@@ -10,11 +10,6 @@ import (
 	"strings"
 )
 
-type Plugin struct {
-	Name string
-	Path string
-}
-
 type Entry struct {
 	Name string
 	Kind string // script|function
@@ -66,18 +61,6 @@ var ErrNotFound = errors.New("plugin not found")
 type RunResult struct {
 	Output string
 	Err    error
-}
-
-func List(baseDir string) ([]Plugin, error) {
-	items, err := ListEntries(baseDir, true)
-	if err != nil {
-		return nil, err
-	}
-	out := make([]Plugin, 0, len(items))
-	for _, it := range items {
-		out = append(out, Plugin{Name: it.Name, Path: it.Path})
-	}
-	return out, nil
 }
 
 func ListEntries(baseDir string, includeFunctions bool) ([]Entry, error) {
@@ -262,10 +245,6 @@ func buildInfoFileStamps(info Info) map[string]int64 {
 func Run(baseDir, name string, args []string) error {
 	r := runPluginInternal(baseDir, name, args, true)
 	return r.Err
-}
-
-func RunWithOutput(baseDir, name string, args []string) RunResult {
-	return runPluginInternal(baseDir, name, args, true)
 }
 
 func RunWithOutputAgent(baseDir, name string, args []string) RunResult {

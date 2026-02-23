@@ -41,10 +41,6 @@ func RunRead(r *bufio.Reader) int {
 	return printFileContents(path, offset, limit)
 }
 
-func RunReadAuto(baseDir string, params map[string]string) int {
-	return RunReadAutoDetailed(baseDir, params).Code
-}
-
 func RunReadAutoDetailed(baseDir string, params map[string]string) AutoRunResult {
 	raw := strings.TrimSpace(params["path"])
 	if raw == "" {

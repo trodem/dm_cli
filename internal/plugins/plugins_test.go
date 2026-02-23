@@ -44,7 +44,7 @@ func TestListDeduplicatesByPluginName(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	items, err := List(baseDir)
+	items, err := ListEntries(baseDir, false)
 	if err != nil {
 		t.Fatal(err)
 	}

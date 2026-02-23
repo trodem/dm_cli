@@ -19,20 +19,6 @@ func PrintKV(label, value string) {
 	fmt.Printf("%-12s %s\n", label+":", value)
 }
 
-func PrintMenuLine(key, label string, isDefault bool) {
-	k := Warn(key + ")")
-	rendered := label
-	ll := strings.ToLower(strings.TrimSpace(label))
-	if strings.Contains(ll, "[x] exit") || ll == "exit" {
-		rendered = Error(label)
-	}
-	if isDefault {
-		fmt.Printf("  %-2s %s %s\n", k, rendered, Muted("[Enter]"))
-		return
-	}
-	fmt.Printf("  %-2s %s\n", k, rendered)
-}
-
 func Accent(text string) string {
 	return colorize("36", text) // cyan
 }
