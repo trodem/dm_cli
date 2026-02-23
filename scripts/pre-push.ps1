@@ -13,10 +13,14 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 Write-Host "=== pre-push: golangci-lint ===" -ForegroundColor Cyan
-golangci-lint run
-if ($LASTEXITCODE -ne 0) {
-    Write-Host "Lint failed. Push aborted." -ForegroundColor Red
-    exit 1
+if (Get-Command golangci-lint -ErrorAction SilentlyContinue) {
+    golangci-lint run
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "Lint failed. Push aborted." -ForegroundColor Red
+        exit 1
+    }
+} else {
+    Write-Host "golangci-lint not installed, skipping (CI will catch lint errors)." -ForegroundColor Yellow
 }
 
 Write-Host "=== pre-push: all checks passed ===" -ForegroundColor Green
