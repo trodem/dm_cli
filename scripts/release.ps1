@@ -85,6 +85,9 @@ try {
     if (Test-Path "dm.agent.example.json") {
       Copy-Item "dm.agent.example.json" (Join-Path $stageDir "dm.agent.example.json")
     }
+    if (Test-Path "dm.aliases.json") {
+      Copy-Item "dm.aliases.json" (Join-Path $stageDir "dm.aliases.json")
+    }
     if (Test-Path "plugins") {
       Copy-Item -Recurse -Force "plugins" (Join-Path $stageDir "plugins")
     }

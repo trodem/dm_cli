@@ -45,6 +45,30 @@ func TestParseFlagsOpenShortcut(t *testing.T) {
 	}
 }
 
+func TestParseFlagsRunAliasShortcut(t *testing.T) {
+	out := parseFlags([]string{"-r", "cli"})
+	want := []string{"alias", "run", "cli"}
+	if !reflect.DeepEqual(out, want) {
+		t.Fatalf("expected %v, got %v", want, out)
+	}
+}
+
+func TestParseFlagsAddAliasShortcut(t *testing.T) {
+	out := parseFlags([]string{"-a", "cli", "Get-Location"})
+	want := []string{"alias", "add", "cli", "Get-Location"}
+	if !reflect.DeepEqual(out, want) {
+		t.Fatalf("expected %v, got %v", want, out)
+	}
+}
+
+func TestParseFlagsAskKeepsAsPowerShell(t *testing.T) {
+	out := parseFlags([]string{"ask", "-a", "Get-Location"})
+	want := []string{"ask", "-a", "Get-Location"}
+	if !reflect.DeepEqual(out, want) {
+		t.Fatalf("expected %v, got %v", want, out)
+	}
+}
+
 func TestRunPluginOrSuggestUnknownReturnsError(t *testing.T) {
 	baseDir := t.TempDir()
 	code := runPluginOrSuggest(baseDir, []string{"not-existing-command"})

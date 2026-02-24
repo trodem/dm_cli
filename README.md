@@ -55,9 +55,11 @@ dm -o profile
 ```
 
 Group shortcuts:
+- `-a`, `--add-alias` -> `alias add`
 - `-t`, `--tools` -> `tools`
 - `-p`, `--plugins` -> `plugins`
 - `-o`, `--open` -> `open`
+- `-r`, `--run-alias` -> `alias run`
 
 ## AI Agent (`dm ask`)
 Providers:
@@ -72,6 +74,7 @@ Flags:
 - `--confirm-tools` / `--no-confirm-tools`
 - `--risk-policy strict|normal|off`
 - `--response-mode raw-first|llm-first` (default `raw-first`: show tool/plugin output; LLM recovery text appears only on errors)
+- `-a`, `--as-powershell` (run prompt as direct PowerShell command, bypassing AI planner)
 - `-f`, `--file <path>` (attach file as context, repeatable)
 - `-s`, `--scope <prefix>` (limit catalog to a toolkit domain, e.g. `stibs`, `m365`, `docker`)
 - `--json` (structured output, one-shot mode only)
@@ -81,6 +84,7 @@ Examples:
 ```bash
 dm ask "spiegami questo errore"
 dm ask --provider auto "cerca i file pdf in Downloads"
+dm ask -a "Get-Location"
 dm ask --json "trova file recenti in Downloads"
 dm ask -f config.json "analizza questo file"
 dm ask -f main.go -f go.mod "confronta questi file"
@@ -97,6 +101,22 @@ Interactive `dm ask` commands:
 - `/exit` (or `exit`, `quit`)
 
 Note: commit-message prompts automatically switch to `llm-first` so the final commit subject is always shown.
+
+## Aliases
+Store simple command aliases in `dm.aliases.json` (and automatically sync them to `$PROFILE`):
+
+```bash
+dm alias add d "cd C:\Users\Demtro\Downloads"
+dm alias add ll "Get-ChildItem -Force"
+dm alias ls
+dm alias run d
+dm alias run ll
+dm alias sync
+dm alias rm d
+```
+
+`dm alias run` executes the stored command using the same PowerShell path used by `dm ask -a`.
+`dm alias sync` forces a full rewrite of the managed alias block in `$PROFILE`.
 
 Config path priority:
 1. `DM_AGENT_CONFIG`

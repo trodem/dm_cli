@@ -67,20 +67,7 @@ func loadRuntime() (runtimeContext, error) {
 }
 
 func parseFlags(args []string) []string {
-	out := make([]string, 0, len(args))
-	for i := 0; i < len(args); i++ {
-		arg := args[i]
-		if group, ok := mapGroupShortcut(arg); ok {
-			out = append(out, group)
-			if i+1 < len(args) && !strings.HasPrefix(args[i+1], "-") {
-				out = append(out, args[i+1])
-				i++
-			}
-			continue
-		}
-		out = append(out, arg)
-	}
-	return out
+	return rewriteGroupShortcuts(args)
 }
 
 func runPlugin(baseDir string, args []string) int {

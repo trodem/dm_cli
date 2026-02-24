@@ -50,6 +50,30 @@ func TestRewriteGroupShortcutsOpen(t *testing.T) {
 	}
 }
 
+func TestRewriteGroupShortcutsRunAlias(t *testing.T) {
+	got := rewriteGroupShortcuts([]string{"-r", "cli"})
+	want := []string{"alias", "run", "cli"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("expected %v, got %v", want, got)
+	}
+}
+
+func TestRewriteGroupShortcutsAddAlias(t *testing.T) {
+	got := rewriteGroupShortcuts([]string{"-a", "cli", "Get-Location"})
+	want := []string{"alias", "add", "cli", "Get-Location"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("expected %v, got %v", want, got)
+	}
+}
+
+func TestRewriteGroupShortcutsKeepsAskAsPowerShell(t *testing.T) {
+	got := rewriteGroupShortcuts([]string{"ask", "-a", "Get-Location"})
+	want := []string{"ask", "-a", "Get-Location"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("expected %v, got %v", want, got)
+	}
+}
+
 func TestInstallCompletionPowerShell(t *testing.T) {
 	home := t.TempDir()
 	root := &cobra.Command{Use: "dm"}
@@ -150,3 +174,49 @@ func TestAddCobraSubcommandsIncludesDoctor(t *testing.T) {
 	}
 }
 
+func TestAddCobraSubcommandsIncludesAlias(t *testing.T) {
+	root := &cobra.Command{Use: "dm"}
+	addCobraSubcommands(root)
+
+	cmd, _, err := root.Find([]string{"alias"})
+	if err != nil {
+		t.Fatalf("expected alias command, got error: %v", err)
+	}
+	if cmd == nil || cmd.Name() != "alias" {
+		t.Fatalf("expected alias command, got %#v", cmd)
+	}
+}
+
+func TestAliasCommandIncludesSync(t *testing.T) {
+	root := &cobra.Command{Use: "dm"}
+	addCobraSubcommands(root)
+
+	cmd, _, err := root.Find([]string{"alias", "sync"})
+	if err != nil {
+		t.Fatalf("expected alias sync command, got error: %v", err)
+	}
+	if cmd == nil || cmd.Name() != "sync" {
+		t.Fatalf("expected sync command, got %#v", cmd)
+	}
+}
+
+func TestAskCommandIncludesAsPowerShellFlag(t *testing.T) {
+	root := &cobra.Command{Use: "dm"}
+	addCobraSubcommands(root)
+
+	cmd, _, err := root.Find([]string{"ask"})
+	if err != nil {
+		t.Fatalf("expected ask command, got error: %v", err)
+	}
+	if cmd == nil || cmd.Name() != "ask" {
+		t.Fatalf("expected ask command, got %#v", cmd)
+	}
+
+	f := cmd.Flags().Lookup("as-powershell")
+	if f == nil {
+		t.Fatal("expected --as-powershell flag on ask")
+	}
+	if f.Shorthand != "a" {
+		t.Fatalf("expected shorthand -a, got %q", f.Shorthand)
+	}
+}

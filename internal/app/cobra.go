@@ -51,6 +51,7 @@ func Run(args []string) int {
 	root.PersistentFlags().BoolP("tools", "t", false, "shortcut for 'tools' command")
 	root.PersistentFlags().BoolP("plugins", "p", false, "shortcut for 'plugins' command")
 	root.PersistentFlags().BoolP("open", "o", false, "shortcut for 'open' command")
+	root.PersistentFlags().BoolP("run-alias", "r", false, "shortcut for 'alias run' command")
 	root.CompletionOptions.DisableDefaultCmd = true
 
 	root.PersistentPreRun = func(cmd *cobra.Command, args []string) {
@@ -77,20 +78,20 @@ func Run(args []string) int {
 		if strings.HasPrefix(msg, "unknown help topic") {
 			rest := parseFlags(rewriteGroupShortcuts(args))
 			if len(rest) >= 2 && rest[0] == "help" {
+				rt, loadErr := loadRuntime()
+				if loadErr != nil {
+					fmt.Fprintln(os.Stderr, "Error:", loadErr)
+					return 1
+				}
+				return runPlugin(rt.BaseDir, []string{"info", rest[1]})
+			}
+		}
+		if strings.HasPrefix(msg, "unknown command") {
 			rt, loadErr := loadRuntime()
 			if loadErr != nil {
 				fmt.Fprintln(os.Stderr, "Error:", loadErr)
 				return 1
 			}
-			return runPlugin(rt.BaseDir, []string{"info", rest[1]})
-		}
-	}
-	if strings.HasPrefix(msg, "unknown command") {
-		rt, loadErr := loadRuntime()
-		if loadErr != nil {
-			fmt.Fprintln(os.Stderr, "Error:", loadErr)
-			return 1
-		}
 			rest := parseFlags(rewriteGroupShortcuts(args))
 			if len(rest) > 0 && rest[0] == "$profile" {
 				return showPowerShellSymbols(resolveUserPowerShellProfilePath(), "$PROFILE")

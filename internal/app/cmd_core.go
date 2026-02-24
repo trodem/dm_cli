@@ -47,6 +47,7 @@ func addCobraSubcommands(root *cobra.Command) {
 	root.AddCommand(openCmd)
 	root.AddCommand(newPluginCommand())
 	root.AddCommand(newToolsCommand())
+	root.AddCommand(newAliasCommand())
 	var doctorJSON bool
 	doctorCmd := &cobra.Command{
 		Use:   "doctor",
@@ -83,6 +84,7 @@ func addCobraSubcommands(root *cobra.Command) {
 	var askJSON bool
 	var askFiles []string
 	var askScope string
+	var askAsPowerShell bool
 	askCmd := &cobra.Command{
 		Use:   "ask <prompt...>",
 		Short: "Ask AI (openai|ollama|auto)",
@@ -90,6 +92,17 @@ func addCobraSubcommands(root *cobra.Command) {
 			"With --provider auto, dm tries Ollama first and falls back to OpenAI.",
 		Args: cobra.ArbitraryArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if askAsPowerShell {
+				if len(args) == 0 {
+					return fmt.Errorf("--as-powershell (-a) requires a command")
+				}
+				code := runAskPowerShellBuiltin(strings.Join(args, " "))
+				if code != 0 {
+					return exitCodeError{code: code}
+				}
+				return nil
+			}
+
 			askOpts := agent.AskOptions{
 				Provider: askProvider,
 				Model:    askModel,
@@ -155,7 +168,165 @@ func addCobraSubcommands(root *cobra.Command) {
 	askCmd.Flags().BoolVar(&askJSON, "json", false, "print structured JSON output (non-interactive only)")
 	askCmd.Flags().StringArrayVarP(&askFiles, "file", "f", nil, "attach file as context (repeatable)")
 	askCmd.Flags().StringVarP(&askScope, "scope", "s", "", "limit plugin catalog to a toolkit prefix or domain (e.g. stibs, m365, docker)")
+	askCmd.Flags().BoolVarP(&askAsPowerShell, "as-powershell", "a", false, "run prompt as a direct PowerShell command (bypass AI)")
+	askCmd.MarkFlagsMutuallyExclusive("as-powershell", "json")
 	root.AddCommand(askCmd)
+}
+
+func newAliasCommand() *cobra.Command {
+	aliasCmd := &cobra.Command{
+		Use:   "alias",
+		Short: "Manage local ask aliases",
+		Long:  "Store and run local aliases backed by dm.aliases.json.",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return cmd.Help()
+		},
+	}
+
+	aliasCmd.AddCommand(&cobra.Command{
+		Use:   "ls",
+		Short: "List aliases",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			rt, err := loadRuntime()
+			if err != nil {
+				return err
+			}
+			aliases, err := loadAskAliases(rt.BaseDir)
+			if err != nil {
+				return err
+			}
+			if len(aliases) == 0 {
+				fmt.Println("No aliases configured.")
+				return nil
+			}
+			for _, k := range sortedAliasNames(aliases) {
+				fmt.Printf("%s -> %s\n", k, aliases[k])
+			}
+			return nil
+		},
+	})
+
+	aliasCmd.AddCommand(&cobra.Command{
+		Use:   "add <name> <command...>",
+		Short: "Create or update an alias",
+		Args:  cobra.MinimumNArgs(2),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			rt, err := loadRuntime()
+			if err != nil {
+				return err
+			}
+			name, err := normalizeAskAliasName(args[0])
+			if err != nil {
+				return err
+			}
+			command := strings.TrimSpace(strings.Join(args[1:], " "))
+			if command == "" {
+				return fmt.Errorf("alias command is required")
+			}
+			aliases, err := loadAskAliases(rt.BaseDir)
+			if err != nil {
+				return err
+			}
+			aliases[name] = command
+			if err := saveAskAliases(rt.BaseDir, aliases); err != nil {
+				return err
+			}
+			fmt.Printf("Saved alias: %s -> %s\n", name, command)
+			return nil
+		},
+	})
+
+	aliasCmd.AddCommand(&cobra.Command{
+		Use:   "rm <name>",
+		Short: "Remove an alias",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			rt, err := loadRuntime()
+			if err != nil {
+				return err
+			}
+			name, err := normalizeAskAliasName(args[0])
+			if err != nil {
+				return err
+			}
+			aliases, err := loadAskAliases(rt.BaseDir)
+			if err != nil {
+				return err
+			}
+			if _, ok := aliases[name]; !ok {
+				return fmt.Errorf("alias not found: %s", name)
+			}
+			delete(aliases, name)
+			if err := saveAskAliases(rt.BaseDir, aliases); err != nil {
+				return err
+			}
+			fmt.Printf("Removed alias: %s\n", name)
+			return nil
+		},
+	})
+
+	aliasCmd.AddCommand(&cobra.Command{
+		Use:   "run <name> [extra args...]",
+		Short: "Run alias as PowerShell command",
+		Args:  cobra.MinimumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			rt, err := loadRuntime()
+			if err != nil {
+				return err
+			}
+			name, err := normalizeAskAliasName(args[0])
+			if err != nil {
+				return err
+			}
+			aliases, err := loadAskAliases(rt.BaseDir)
+			if err != nil {
+				return err
+			}
+			baseCommand, ok := aliases[name]
+			if !ok {
+				return fmt.Errorf("alias not found: %s", name)
+			}
+			fullCommand := baseCommand
+			if len(args) > 1 {
+				fullCommand += " " + strings.Join(args[1:], " ")
+			}
+			code := runAskPowerShellBuiltin(fullCommand)
+			if code != 0 {
+				return exitCodeError{code: code}
+			}
+			return nil
+		},
+	})
+
+	aliasCmd.AddCommand(&cobra.Command{
+		Use:   "sync",
+		Short: "Sync aliases to $PROFILE",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			rt, err := loadRuntime()
+			if err != nil {
+				return err
+			}
+			aliases, err := loadAskAliases(rt.BaseDir)
+			if err != nil {
+				return err
+			}
+			if err := syncAskAliasesToProfile(aliases); err != nil {
+				return err
+			}
+			profilePath := strings.TrimSpace(askAliasProfilePathResolver())
+			if profilePath == "" {
+				fmt.Println("Aliases synced. $PROFILE path is not available on this system.")
+				return nil
+			}
+			fmt.Printf("Aliases synced to $PROFILE: %s\n", profilePath)
+			return nil
+		},
+	})
+
+	return aliasCmd
 }
 
 func newPluginCommand() *cobra.Command {
