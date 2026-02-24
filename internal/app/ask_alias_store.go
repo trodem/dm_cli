@@ -15,6 +15,7 @@ const (
 )
 
 var askAliasProfilePathResolver = resolveUserPowerShellProfilePath
+var askAliasProfilePathsResolver = resolveAllUserPowerShellProfilePaths
 
 func askAliasFilePath(baseDir string) string {
 	return filepath.Join(baseDir, "dm.aliases.json")
@@ -101,7 +102,21 @@ func sortedAliasNames(aliases map[string]string) []string {
 }
 
 func syncAskAliasesToProfile(aliases map[string]string) error {
-	profilePath := strings.TrimSpace(askAliasProfilePathResolver())
+	paths := askAliasProfilePathsResolver()
+	if len(paths) == 0 {
+		return nil
+	}
+	block := renderAskAliasesProfileBlock(aliases)
+	for _, profilePath := range paths {
+		if err := syncAskAliasesBlockToProfilePath(profilePath, block); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func syncAskAliasesBlockToProfilePath(profilePath, block string) error {
+	profilePath = strings.TrimSpace(profilePath)
 	if profilePath == "" {
 		return nil
 	}
@@ -114,9 +129,31 @@ func syncAskAliasesToProfile(aliases map[string]string) error {
 	} else if !os.IsNotExist(err) {
 		return err
 	}
-	block := renderAskAliasesProfileBlock(aliases)
 	updated := upsertAskAliasesProfileBlock(existing, block)
 	return os.WriteFile(profilePath, []byte(updated), 0644)
+}
+
+func resolveAllUserPowerShellProfilePaths() []string {
+	paths := []string{}
+	add := func(p string) {
+		p = strings.TrimSpace(p)
+		if p == "" {
+			return
+		}
+		for _, existing := range paths {
+			if strings.EqualFold(existing, p) {
+				return
+			}
+		}
+		paths = append(paths, p)
+	}
+	home, _ := os.UserHomeDir()
+	if strings.TrimSpace(home) != "" {
+		add(filepath.Join(home, "Documents", "PowerShell", "Microsoft.PowerShell_profile.ps1"))
+		add(filepath.Join(home, "Documents", "WindowsPowerShell", "Microsoft.PowerShell_profile.ps1"))
+	}
+	add(askAliasProfilePathResolver())
+	return paths
 }
 
 func renderAskAliasesProfileBlock(aliases map[string]string) string {
@@ -140,7 +177,7 @@ func renderAskAliasesProfileBlock(aliases map[string]string) string {
 	b.WriteString("    $cmd = $entry.Value\n")
 	b.WriteString("    $fn = 'dm_alias_' + ($name -replace '[^a-zA-Z0-9_]', '_')\n")
 	b.WriteString("    Set-Item -Path ('Function:' + $fn) -Value ([ScriptBlock]::Create($cmd))\n")
-	b.WriteString("    Set-Alias -Name $name -Value $fn -Scope Global\n")
+	b.WriteString("    Set-Alias -Name $name -Value $fn -Scope Global -Force\n")
 	b.WriteString("}\n")
 	b.WriteString(dmAliasProfileEnd + "\n")
 	return b.String()

@@ -27,9 +27,9 @@ func TestNormalizeAskAliasName(t *testing.T) {
 func TestLoadSaveAskAliases(t *testing.T) {
 	baseDir := t.TempDir()
 	profilePath := filepath.Join(baseDir, "Microsoft.PowerShell_profile.ps1")
-	prevResolver := askAliasProfilePathResolver
-	askAliasProfilePathResolver = func() string { return profilePath }
-	defer func() { askAliasProfilePathResolver = prevResolver }()
+	prevPathsResolver := askAliasProfilePathsResolver
+	askAliasProfilePathsResolver = func() []string { return []string{profilePath} }
+	defer func() { askAliasProfilePathsResolver = prevPathsResolver }()
 
 	aliases := map[string]string{
 		"ll": "Get-ChildItem -Force",
@@ -55,6 +55,30 @@ func TestLoadSaveAskAliases(t *testing.T) {
 	}
 	if !strings.Contains(profileText, "'ll' = 'Get-ChildItem -Force'") {
 		t.Fatalf("expected alias payload in profile, got: %q", profileText)
+	}
+}
+
+func TestResolveAllUserPowerShellProfilePathsIncludesBoth(t *testing.T) {
+	prevResolver := askAliasProfilePathResolver
+	askAliasProfilePathResolver = func() string { return "" }
+	defer func() { askAliasProfilePathResolver = prevResolver }()
+
+	paths := resolveAllUserPowerShellProfilePaths()
+	if len(paths) < 2 {
+		t.Fatalf("expected at least two profile paths, got %v", paths)
+	}
+	hasPowerShell := false
+	hasWindowsPowerShell := false
+	for _, p := range paths {
+		if strings.Contains(strings.ToLower(p), strings.ToLower(`\documents\powershell\microsoft.powershell_profile.ps1`)) {
+			hasPowerShell = true
+		}
+		if strings.Contains(strings.ToLower(p), strings.ToLower(`\documents\windowspowershell\microsoft.powershell_profile.ps1`)) {
+			hasWindowsPowerShell = true
+		}
+	}
+	if !hasPowerShell || !hasWindowsPowerShell {
+		t.Fatalf("expected both profile targets, got %v", paths)
 	}
 }
 

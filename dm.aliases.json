@@ -1,4 +1,4 @@
 {
-  "cli": "explorer C:\\Users\\Demtro\\AppData\\Local\\Programs\\dm-cli",
-  "cd-cli": "C:\\Users\\Demtro\\AppData\\Local\\Programs\\dm-cli"
+  "ex-cli": "explorer C:\\Users\\Demtro\\AppData\\Local\\Programs\\dm-cli",
+  "cd-cli": "cd C:\\Users\\Demtro\\AppData\\Local\\Programs\\dm-cli"
 }

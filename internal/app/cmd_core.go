@@ -316,12 +316,15 @@ func newAliasCommand() *cobra.Command {
 			if err := syncAskAliasesToProfile(aliases); err != nil {
 				return err
 			}
-			profilePath := strings.TrimSpace(askAliasProfilePathResolver())
-			if profilePath == "" {
+			profilePaths := askAliasProfilePathsResolver()
+			if len(profilePaths) == 0 {
 				fmt.Println("Aliases synced. $PROFILE path is not available on this system.")
 				return nil
 			}
-			fmt.Printf("Aliases synced to $PROFILE: %s\n", profilePath)
+			fmt.Println("Aliases synced to profiles:")
+			for _, p := range profilePaths {
+				fmt.Printf("- %s\n", p)
+			}
 			return nil
 		},
 	})

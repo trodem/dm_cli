@@ -103,7 +103,7 @@ Interactive `dm ask` commands:
 Note: commit-message prompts automatically switch to `llm-first` so the final commit subject is always shown.
 
 ## Aliases
-Store simple command aliases in `dm.aliases.json` (and automatically sync them to `$PROFILE`):
+Store simple command aliases in `dm.aliases.json` (and automatically sync them to PowerShell profile files):
 
 ```bash
 dm alias add d "cd C:\Users\Demtro\Downloads"
@@ -116,7 +116,7 @@ dm alias rm d
 ```
 
 `dm alias run` executes the stored command using the same PowerShell path used by `dm ask -a`.
-`dm alias sync` forces a full rewrite of the managed alias block in `$PROFILE`.
+`dm alias sync` forces a full rewrite of the managed alias block in the detected profile files (`PowerShell` and `WindowsPowerShell`).
 
 Config path priority:
 1. `DM_AGENT_CONFIG`
