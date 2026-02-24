@@ -480,14 +480,14 @@ func handleCreateFunction(ctx askStepContext, decision agent.DecisionResult) (bo
 	ctx.out.StepInfo(ctx.step, askMaxSteps, plannedActionSummary(decision), decision.Reason, "HIGH", "generates and writes new code")
 
 	reader := bufio.NewReader(os.Stdin)
-	fmt.Print("  " + ui.Prompt("Create? [y/N] "))
+	fmt.Print(ui.Prompt("Create? [y/N] "))
 	confirm1 := strings.ToLower(strings.TrimSpace(readLine(reader)))
 	if confirm1 != "y" && confirm1 != "yes" {
 		ctx.out.Canceled(decision.Answer)
 		return false, 0
 	}
 
-	fmt.Println("  " + ui.Muted("Generating function..."))
+	fmt.Println(ui.Muted("Generating function..."))
 	summaries := listToolkitSummaries(ctx.baseDir)
 	builderReq := agent.BuilderRequest{
 		FunctionDescription: desc,
@@ -500,9 +500,9 @@ func handleCreateFunction(ctx askStepContext, decision agent.DecisionResult) (bo
 		return false, 1
 	}
 	if valErr := validatePowerShellSyntax(built.FunctionCode); valErr != nil {
-		fmt.Println("  " + ui.Warn("Syntax errors in generated code:"))
-		fmt.Println("  " + valErr.Error())
-		fmt.Println("  " + ui.Muted("Aborting — code will NOT be written."))
+		fmt.Println(ui.Warn("Syntax errors in generated code:"))
+		fmt.Println(valErr.Error())
+		fmt.Println(ui.Muted("Aborting — code will NOT be written."))
 		*ctx.history = append(*ctx.history, askActionRecord{
 			Step: ctx.step, Action: "create_function", Target: built.FunctionName,
 			Result: "syntax validation failed: " + valErr.Error(),
@@ -511,23 +511,23 @@ func handleCreateFunction(ctx askStepContext, decision agent.DecisionResult) (bo
 	}
 
 	fmt.Println()
-	fmt.Println("  " + ui.Accent("--- "+built.FunctionName+" ---"))
+	fmt.Println(ui.Accent("--- " + built.FunctionName + " ---"))
 	fmt.Println(built.FunctionCode)
-	fmt.Println("  " + ui.Accent("---"))
+	fmt.Println(ui.Accent("---"))
 	fmt.Println()
 	if strings.TrimSpace(built.Explanation) != "" {
-		fmt.Println("  " + ui.Muted(built.Explanation))
+		fmt.Println(ui.Muted(built.Explanation))
 	}
 	if built.IsNewToolkit {
-		fmt.Println("  " + ui.Muted("New toolkit: "+built.TargetFile+" ("+built.NewPrefix+"_*)"))
+		fmt.Println(ui.Muted("New toolkit: " + built.TargetFile + " (" + built.NewPrefix + "_*)"))
 	} else {
-		fmt.Println("  " + ui.Muted("Target: "+built.TargetFile))
+		fmt.Println(ui.Muted("Target: " + built.TargetFile))
 	}
 	fmt.Println()
-	fmt.Print("  " + ui.Prompt("Write code? [y/N] "))
+	fmt.Print(ui.Prompt("Write code? [y/N] "))
 	confirm2 := strings.ToLower(strings.TrimSpace(readLine(reader)))
 	if confirm2 != "y" && confirm2 != "yes" {
-		fmt.Println("  " + ui.Warn("Canceled."))
+		fmt.Println(ui.Warn("Canceled."))
 		return false, 0
 	}
 
@@ -540,7 +540,7 @@ func handleCreateFunction(ctx askStepContext, decision agent.DecisionResult) (bo
 		}
 		if _, statErr := os.Stat(targetPath); os.IsNotExist(statErr) {
 			needsNewToolkit = true
-			fmt.Println("  " + ui.Muted("Target file not found, creating new toolkit."))
+			fmt.Println(ui.Muted("Target file not found, creating new toolkit."))
 		}
 	}
 	if needsNewToolkit {
@@ -556,14 +556,14 @@ func handleCreateFunction(ctx askStepContext, decision agent.DecisionResult) (bo
 			ctx.out.Error("writing toolkit: " + writeErr.Error())
 			return false, 1
 		}
-		fmt.Println("  " + ui.OK("Created: "+writtenPath))
+		fmt.Println(ui.OK("Created: " + writtenPath))
 	} else {
 		if err := appendFunctionToToolkit(targetPath, built.FunctionCode); err != nil {
 			ctx.out.Error("writing function: " + err.Error())
 			return false, 1
 		}
 		_ = updateToolkitFunctionsIndex(targetPath, built.FunctionName)
-		fmt.Println("  " + ui.OK("Added "+built.FunctionName+" to "+targetPath))
+		fmt.Println(ui.OK("Added " + built.FunctionName + " to " + targetPath))
 	}
 
 	*ctx.catalog = buildPluginCatalogScoped(ctx.baseDir, ctx.scope)
@@ -571,7 +571,7 @@ func handleCreateFunction(ctx askStepContext, decision agent.DecisionResult) (bo
 		Step: ctx.step, Action: "create_function", Target: built.FunctionName,
 		Result: "ok; function created",
 	})
-	fmt.Println("  " + ui.Muted("Catalog updated. Running..."))
+	fmt.Println(ui.Muted("Catalog updated. Running..."))
 	return true, 0
 }
 
@@ -699,13 +699,13 @@ func runAskInteractiveWithRisk(baseDir string, opts agent.AskOptions, confirmToo
 	catalog := buildPluginCatalogScoped(baseDir, scope)
 	toolsCatalog := buildToolsCatalog()
 
-	fmt.Printf("%s %s %s\n", ui.Accent("dm ask"), ui.Muted("|"), ui.Muted(session.Provider+"/"+session.Model))
-	fmt.Println(ui.Muted("Type your question. Commands: /exit, exit, quit"))
+	printAskInteractiveHeader(session.Provider, session.Model)
 	reader := bufio.NewReader(os.Stdin)
 	previousPrompts := []string{}
 	var sessionHistory []askActionRecord
 
 	if strings.TrimSpace(initialPrompt) != "" {
+		fmt.Println()
 		fmt.Printf("%s%s\n", ui.Warn(promptLabel), initialPrompt)
 		_, turnHistory := runAskOnceWithSession(askSessionParams{
 			baseDir: baseDir, prompt: initialPrompt, opts: sessionOpts,
@@ -726,8 +726,56 @@ func runAskInteractiveWithRisk(baseDir string, opts agent.AskOptions, confirmToo
 			return 0
 		}
 		prompt := strings.TrimSpace(line)
+		if isCD, target := parseAskCDCommand(prompt); isCD {
+			if strings.TrimSpace(target) == "" {
+				fmt.Println(ui.Muted("Current dir: " + askCurrentDir()))
+				continue
+			}
+			cleanTarget := strings.Trim(strings.TrimSpace(target), "\"'")
+			if cleanTarget == "" {
+				fmt.Println(ui.Error("Error: missing directory path"))
+				continue
+			}
+			if !filepath.IsAbs(cleanTarget) {
+				cleanTarget = filepath.Join(askCurrentDir(), cleanTarget)
+			}
+			cleanTarget = filepath.Clean(cleanTarget)
+			info, statErr := os.Stat(cleanTarget)
+			if statErr != nil {
+				fmt.Println(ui.Error("Error: directory not found: " + cleanTarget))
+				continue
+			}
+			if !info.IsDir() {
+				fmt.Println(ui.Error("Error: path is not a directory: " + cleanTarget))
+				continue
+			}
+			if chErr := os.Chdir(cleanTarget); chErr != nil {
+				fmt.Println(ui.Error("Error: cannot change directory: " + chErr.Error()))
+				continue
+			}
+			fmt.Println(ui.Muted("Current dir: " + askCurrentDir()))
+			continue
+		}
 		switch strings.ToLower(prompt) {
 		case "":
+			continue
+		case "/pwd", "pwd":
+			fmt.Println(ui.Muted("Current dir: " + askCurrentDir()))
+			continue
+		case "/help", "help":
+			printAskInteractiveHelp()
+			continue
+		case "/status", "status":
+			printAskInteractiveStatus(session.Provider, session.Model, riskPolicy, responseMode, scope, len(previousPrompts), len(sessionHistory))
+			continue
+		case "/reset", "reset":
+			previousPrompts = []string{}
+			sessionHistory = nil
+			fmt.Println(ui.Warn("Session context reset."))
+			continue
+		case "clear", "cls", "/clear":
+			clearAskScreen()
+			printAskInteractiveHeader(session.Provider, session.Model)
 			continue
 		case "/exit", "exit", "quit":
 			return 0
@@ -745,4 +793,64 @@ func runAskInteractiveWithRisk(baseDir string, opts agent.AskOptions, confirmToo
 			previousPrompts = previousPrompts[len(previousPrompts)-askPreviousPromptsMax:]
 		}
 	}
+}
+
+func printAskInteractiveHeader(provider, model string) {
+	fmt.Printf("%s %s %s\n", ui.Accent("dm ask"), ui.Muted("|"), ui.Muted(provider+"/"+model))
+	fmt.Println(ui.Muted("Type your question. Commands: /cd, /pwd, /help, /status, /reset, /clear, /exit"))
+}
+
+func printAskInteractiveHelp() {
+	fmt.Println()
+	fmt.Println(ui.Accent("Ask commands:"))
+	fmt.Println(ui.Muted("- /cd <path> (or cd <path>): change current working directory"))
+	fmt.Println(ui.Muted("- /pwd (or pwd): show current working directory"))
+	fmt.Println(ui.Muted("- /help (or help): show this command list"))
+	fmt.Println(ui.Muted("- /status (or status): show session settings and counters"))
+	fmt.Println(ui.Muted("- /reset (or reset): clear session prompt/action context"))
+	fmt.Println(ui.Muted("- /clear (or clear/cls): clear screen"))
+	fmt.Println(ui.Muted("- /exit (or exit/quit): leave ask session"))
+}
+
+func printAskInteractiveStatus(provider, model, riskPolicy, responseMode, scope string, promptCount, historyCount int) {
+	scopeValue := strings.TrimSpace(scope)
+	if scopeValue == "" {
+		scopeValue = "none"
+	}
+	fmt.Println()
+	fmt.Println(ui.Accent("Session status"))
+	fmt.Printf("%s %s\n", ui.Muted("Provider/Model:"), provider+"/"+model)
+	fmt.Printf("%s %s\n", ui.Muted("Risk policy:"), riskPolicy)
+	fmt.Printf("%s %s\n", ui.Muted("Response mode:"), responseMode)
+	fmt.Printf("%s %s\n", ui.Muted("Scope:"), scopeValue)
+	fmt.Printf("%s %d\n", ui.Muted("Previous prompts:"), promptCount)
+	fmt.Printf("%s %d\n", ui.Muted("Session actions:"), historyCount)
+}
+
+func clearAskScreen() {
+	// ANSI clear screen + move cursor home.
+	fmt.Print("\033[H\033[2J")
+}
+
+func parseAskCDCommand(raw string) (bool, string) {
+	s := strings.TrimSpace(raw)
+	lc := strings.ToLower(s)
+	switch {
+	case lc == "cd" || lc == "/cd":
+		return true, ""
+	case strings.HasPrefix(lc, "cd "):
+		return true, strings.TrimSpace(s[3:])
+	case strings.HasPrefix(lc, "/cd "):
+		return true, strings.TrimSpace(s[4:])
+	default:
+		return false, ""
+	}
+}
+
+func askCurrentDir() string {
+	wd, err := os.Getwd()
+	if err != nil || strings.TrimSpace(wd) == "" {
+		return "."
+	}
+	return wd
 }

@@ -40,14 +40,13 @@ func (w *askTTYWriter) StepInfo(step, maxSteps int, summary, reason, risk, riskR
 		"risk", risk,
 		"risk_reason", riskReason,
 	)
-	fmt.Println()
-	fmt.Printf("  %s %s\n", ui.Accent(">"), humanizeSummary(summary))
+	fmt.Printf("%s %s\n", ui.Accent(">"), humanizeSummary(summary))
 	if strings.ToLower(risk) != "low" {
 		riskLabel := ui.Warn(strings.ToUpper(risk))
 		if strings.ToLower(risk) == "high" {
 			riskLabel = ui.Error(strings.ToUpper(risk))
 		}
-		fmt.Printf("  %s %s\n", ui.Muted("Risk:"), riskLabel)
+		fmt.Printf("%s %s\n", ui.Muted("Risk:"), riskLabel)
 	}
 }
 

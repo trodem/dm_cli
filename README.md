@@ -87,6 +87,15 @@ dm ask -f main.go -f go.mod "confronta questi file"
 dm ask --scope stibs "stato del database"
 ```
 
+Interactive `dm ask` commands:
+- `/cd <path>` (or `cd <path>`) to change current working directory
+- `/pwd` (or `pwd`) to show current working directory
+- `/help` (or `help`)
+- `/status` (or `status`)
+- `/reset` (or `reset`) to clear session context
+- `/clear` (or `clear`, `cls`)
+- `/exit` (or `exit`, `quit`)
+
 Note: commit-message prompts automatically switch to `llm-first` so the final commit subject is always shown.
 
 Config path priority:
