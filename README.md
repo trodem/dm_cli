@@ -87,6 +87,8 @@ dm ask -f main.go -f go.mod "confronta questi file"
 dm ask --scope stibs "stato del database"
 ```
 
+Note: commit-message prompts automatically switch to `llm-first` so the final commit subject is always shown.
+
 Config path priority:
 1. `DM_AGENT_CONFIG`
 2. `dm.agent.json` next to executable

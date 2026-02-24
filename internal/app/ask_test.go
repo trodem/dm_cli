@@ -78,6 +78,18 @@ func TestNormalizeResponseMode(t *testing.T) {
 	}
 }
 
+func TestResponseModeForPrompt(t *testing.T) {
+	if got := responseModeForPrompt(responseModeRawFirst, "show recent files"); got != responseModeRawFirst {
+		t.Fatalf("expected raw-first for normal prompt, got %q", got)
+	}
+	if got := responseModeForPrompt(responseModeRawFirst, "scrivi un messaggio di commit per le modifiche correnti"); got != responseModeLLMFirst {
+		t.Fatalf("expected llm-first for commit prompt, got %q", got)
+	}
+	if got := responseModeForPrompt(responseModeLLMFirst, "show recent files"); got != responseModeLLMFirst {
+		t.Fatalf("expected llm-first to remain unchanged, got %q", got)
+	}
+}
+
 func TestAssessDecisionRisk(t *testing.T) {
 	risk, _ := assessDecisionRisk(agent.DecisionResult{
 		Action:   "run_tool",

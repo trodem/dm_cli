@@ -106,6 +106,7 @@ func runAskOnceWithSession(p askSessionParams) (int, []askActionRecord) {
 		envContext += "\n" + p.fileContext
 	}
 	history := []askActionRecord{}
+	effectiveResponseMode := responseModeForPrompt(p.responseMode, p.prompt)
 
 	var out askOutputWriter
 	if p.jsonOut {
@@ -166,7 +167,7 @@ func runAskOnceWithSession(p askSessionParams) (int, []askActionRecord) {
 			opts:         p.opts,
 			confirmTools: p.confirmTools,
 			riskPolicy:   p.riskPolicy,
-			responseMode: p.responseMode,
+			responseMode: effectiveResponseMode,
 			jsonOut:      p.jsonOut,
 			step:         step,
 			out:          out,
@@ -195,6 +196,37 @@ func runAskOnceWithSession(p askSessionParams) (int, []askActionRecord) {
 		}
 	}
 	return 0, history
+}
+
+func responseModeForPrompt(configuredMode, prompt string) string {
+	mode := strings.ToLower(strings.TrimSpace(configuredMode))
+	if mode == "" {
+		mode = responseModeRawFirst
+	}
+	if mode == responseModeLLMFirst {
+		return mode
+	}
+	if !isCommitMessagePrompt(prompt) {
+		return mode
+	}
+	return responseModeLLMFirst
+}
+
+func isCommitMessagePrompt(prompt string) bool {
+	p := strings.ToLower(strings.TrimSpace(prompt))
+	if p == "" {
+		return false
+	}
+	hints := []string{
+		"commit message", "commit msg", "git commit message", "commit subject",
+		"messaggio di commit", "messaggio commit",
+	}
+	for _, h := range hints {
+		if strings.Contains(p, h) {
+			return true
+		}
+	}
+	return false
 }
 
 func handleRunPlugin(ctx askStepContext, decision agent.DecisionResult) (bool, int) {
