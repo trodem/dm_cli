@@ -58,6 +58,26 @@ func TestNormalizeRiskPolicy(t *testing.T) {
 	}
 }
 
+func TestNormalizeResponseMode(t *testing.T) {
+	v, err := normalizeResponseMode("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if v != responseModeRawFirst {
+		t.Fatalf("unexpected mode: %q", v)
+	}
+	v, err = normalizeResponseMode("llm-first")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if v != responseModeLLMFirst {
+		t.Fatalf("unexpected mode: %q", v)
+	}
+	if _, err := normalizeResponseMode("invalid"); err == nil {
+		t.Fatal("expected error for invalid response mode")
+	}
+}
+
 func TestAssessDecisionRisk(t *testing.T) {
 	risk, _ := assessDecisionRisk(agent.DecisionResult{
 		Action:   "run_tool",

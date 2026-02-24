@@ -25,6 +25,18 @@ func normalizeRiskPolicy(raw string) (string, error) {
 	}
 }
 
+func normalizeResponseMode(raw string) (string, error) {
+	mode := strings.ToLower(strings.TrimSpace(raw))
+	switch mode {
+	case "", responseModeRawFirst:
+		return responseModeRawFirst, nil
+	case responseModeLLMFirst:
+		return responseModeLLMFirst, nil
+	default:
+		return "", fmt.Errorf("invalid --response-mode %q (use raw-first|llm-first)", raw)
+	}
+}
+
 func shouldConfirmAction(confirmTools bool, riskPolicy, risk string) bool {
 	switch riskPolicy {
 	case riskPolicyOff:

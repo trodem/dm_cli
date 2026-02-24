@@ -71,6 +71,7 @@ Flags:
 - `--base-url <url>`
 - `--confirm-tools` / `--no-confirm-tools`
 - `--risk-policy strict|normal|off`
+- `--response-mode raw-first|llm-first` (default `raw-first`: show tool/plugin output; LLM recovery text appears only on errors)
 - `-f`, `--file <path>` (attach file as context, repeatable)
 - `-s`, `--scope <prefix>` (limit catalog to a toolkit domain, e.g. `stibs`, `m365`, `docker`)
 - `--json` (structured output, one-shot mode only)

@@ -25,6 +25,9 @@ const (
 	riskPolicyStrict = "strict"
 	riskPolicyNormal = "normal"
 	riskPolicyOff    = "off"
+
+	responseModeRawFirst = "raw-first"
+	responseModeLLMFirst = "llm-first"
 )
 
 type askActionRecord struct {
@@ -43,6 +46,7 @@ type askSessionParams struct {
 	opts            agent.AskOptions
 	confirmTools    bool
 	riskPolicy      string
+	responseMode    string
 	previousPrompts []string
 	sessionHistory  []askActionRecord
 	jsonOut         bool
@@ -78,6 +82,7 @@ type askStepContext struct {
 	opts         agent.AskOptions
 	confirmTools bool
 	riskPolicy   string
+	responseMode string
 	jsonOut      bool
 	step         int
 	out          askOutputWriter
@@ -161,6 +166,7 @@ func runAskOnceWithSession(p askSessionParams) (int, []askActionRecord) {
 			opts:         p.opts,
 			confirmTools: p.confirmTools,
 			riskPolicy:   p.riskPolicy,
+			responseMode: p.responseMode,
 			jsonOut:      p.jsonOut,
 			step:         step,
 			out:          out,
@@ -193,12 +199,13 @@ func runAskOnceWithSession(p askSessionParams) (int, []askActionRecord) {
 
 func handleRunPlugin(ctx askStepContext, decision agent.DecisionResult) (bool, int) {
 	if strings.TrimSpace(decision.Plugin) == "" {
-		ctx.out.Error("agent selected run_plugin without plugin name")
+		ctx.out.ErrorWithAnswer("agent selected run_plugin without plugin name", buildErrorRecoveryAnswer(ctx, decision, "agent decision error: missing plugin name"))
 		return false, 1
 	}
 	info, err := plugins.GetInfo(ctx.baseDir, decision.Plugin)
 	if err != nil {
-		ctx.out.ErrorWithAnswer("agent selected unknown plugin: "+decision.Plugin, decision.Answer)
+		recovery := buildErrorRecoveryAnswer(ctx, decision, "agent selected unknown plugin: "+decision.Plugin)
+		ctx.out.ErrorWithAnswer("agent selected unknown plugin: "+decision.Plugin, recovery)
 		return false, 1
 	}
 
@@ -249,8 +256,9 @@ func handleRunPlugin(ctx askStepContext, decision agent.DecisionResult) (bool, i
 	if runResult.Err != nil {
 		stepRecord.Status = "error"
 		ctx.out.AddStep(stepRecord)
+		recovery := buildErrorRecoveryAnswer(ctx, decision, runResult.Err.Error()+"\n"+truncateForHistory(runResult.Output, askHistoryMaxLen))
 		if ctx.jsonOut {
-			ctx.out.ErrorWithAnswer(runResult.Err.Error(), decision.Answer)
+			ctx.out.ErrorWithAnswer(runResult.Err.Error(), recovery)
 			return false, 1
 		}
 		printAgentActionError(runResult.Err)
@@ -277,9 +285,14 @@ func handleRunPlugin(ctx askStepContext, decision agent.DecisionResult) (bool, i
 		Step: ctx.step, Action: "run_plugin", Target: decision.Plugin,
 		Args: argsDisplay, Result: historyResult,
 	})
-	ctx.out.PartialAnswer(decision.Answer)
+	if ctx.responseMode == responseModeRawFirst {
+		return false, 0
+	}
+	if ctx.responseMode == responseModeLLMFirst {
+		ctx.out.PartialAnswer(decision.Answer)
+	}
 	if ctx.step == askMaxSteps {
-		ctx.out.MaxStepsReached(decision.Answer)
+		ctx.out.MaxStepsReached("")
 		return false, 0
 	}
 	return true, 0
@@ -288,11 +301,12 @@ func handleRunPlugin(ctx askStepContext, decision agent.DecisionResult) (bool, i
 func handleRunTool(ctx askStepContext, decision agent.DecisionResult) (bool, int) {
 	toolName := strings.TrimSpace(decision.Tool)
 	if toolName == "" {
-		ctx.out.Error("agent selected run_tool without tool name")
+		ctx.out.ErrorWithAnswer("agent selected run_tool without tool name", buildErrorRecoveryAnswer(ctx, decision, "agent decision error: missing tool name"))
 		return false, 1
 	}
 	if !isKnownTool(toolName) {
-		ctx.out.ErrorWithAnswer("agent selected unknown tool: "+toolName, decision.Answer)
+		recovery := buildErrorRecoveryAnswer(ctx, decision, "agent selected unknown tool: "+toolName)
+		ctx.out.ErrorWithAnswer("agent selected unknown tool: "+toolName, recovery)
 		return false, 1
 	}
 
@@ -325,8 +339,9 @@ func handleRunTool(ctx askStepContext, decision agent.DecisionResult) (bool, int
 		if captured != "" {
 			errResult += "\n" + truncateForHistory(captured, askHistoryMaxLen)
 		}
+		recovery := buildErrorRecoveryAnswer(ctx, decision, errResult)
 		if ctx.jsonOut {
-			ctx.out.ErrorWithAnswer(fmt.Sprintf("tool execution failed: %s", toolName), decision.Answer)
+			ctx.out.ErrorWithAnswer(fmt.Sprintf("tool execution failed: %s", toolName), recovery)
 			return false, run.Code
 		}
 		*ctx.history = append(*ctx.history, askActionRecord{
@@ -352,8 +367,9 @@ func handleRunTool(ctx askStepContext, decision agent.DecisionResult) (bool, int
 		if run.Code != 0 {
 			stepRecord.Status = "error"
 			ctx.out.AddStep(stepRecord)
+			recovery := buildErrorRecoveryAnswer(ctx, decision, fmt.Sprintf("tool continuation failed (exit code %d): %s", run.Code, truncateForHistory(captured, askHistoryMaxLen)))
 			if ctx.jsonOut {
-				ctx.out.ErrorWithAnswer(fmt.Sprintf("tool continuation failed: %s", toolName), decision.Answer)
+				ctx.out.ErrorWithAnswer(fmt.Sprintf("tool continuation failed: %s", toolName), recovery)
 				return false, run.Code
 			}
 			*ctx.history = append(*ctx.history, askActionRecord{
@@ -376,12 +392,48 @@ func handleRunTool(ctx askStepContext, decision agent.DecisionResult) (bool, int
 		Step: ctx.step, Action: "run_tool", Target: toolName,
 		Args: formatToolArgs(decision.ToolArgs), Result: historyResult,
 	})
-	ctx.out.PartialAnswer(decision.Answer)
+	if ctx.responseMode == responseModeRawFirst {
+		return false, 0
+	}
+	if ctx.responseMode == responseModeLLMFirst {
+		ctx.out.PartialAnswer(decision.Answer)
+	}
 	if ctx.step == askMaxSteps {
-		ctx.out.MaxStepsReached(decision.Answer)
+		ctx.out.MaxStepsReached("")
 		return false, 0
 	}
 	return true, 0
+}
+
+func buildErrorRecoveryAnswer(ctx askStepContext, decision agent.DecisionResult, errText string) string {
+	fallback := strings.TrimSpace(decision.Answer)
+	if strings.TrimSpace(errText) == "" {
+		return fallback
+	}
+	prompt := strings.Join([]string{
+		"User request:",
+		strings.TrimSpace(ctx.prompt),
+		"",
+		"Failed action:",
+		plannedActionSummary(decision),
+		"",
+		"Error output:",
+		strings.TrimSpace(errText),
+		"",
+		"Provide a concise recovery message (max 3 bullets): probable cause and exact next command/parameters to try.",
+	}, "\n")
+	recoveryOpts := ctx.opts
+	recoveryOpts.JSONMode = false
+	recoveryOpts.SystemPrompt = "You are a CLI recovery assistant. Be concrete and action-oriented."
+	res, err := agent.AskWithOptions(prompt, recoveryOpts)
+	if err != nil {
+		return fallback
+	}
+	advice := strings.TrimSpace(res.Text)
+	if advice == "" {
+		return fallback
+	}
+	return advice
 }
 
 func handleCreateFunction(ctx askStepContext, decision agent.DecisionResult) (bool, int) {
@@ -604,7 +656,7 @@ func decisionSignature(decision agent.DecisionResult) string {
 	}
 }
 
-func runAskInteractiveWithRisk(baseDir string, opts agent.AskOptions, confirmTools bool, riskPolicy string, initialPrompt string, fileContext string, scope string) int {
+func runAskInteractiveWithRisk(baseDir string, opts agent.AskOptions, confirmTools bool, riskPolicy string, responseMode string, initialPrompt string, fileContext string, scope string) int {
 	session, err := agent.ResolveSessionProvider(opts)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "Error:", err)
@@ -626,7 +678,7 @@ func runAskInteractiveWithRisk(baseDir string, opts agent.AskOptions, confirmToo
 		fmt.Printf("%s%s\n", ui.Warn(promptLabel), initialPrompt)
 		_, turnHistory := runAskOnceWithSession(askSessionParams{
 			baseDir: baseDir, prompt: initialPrompt, opts: sessionOpts,
-			confirmTools: confirmTools, riskPolicy: riskPolicy,
+			confirmTools: confirmTools, riskPolicy: riskPolicy, responseMode: responseMode,
 			previousPrompts: previousPrompts, sessionHistory: sessionHistory,
 			catalog: catalog, toolsCatalog: toolsCatalog,
 			fileContext: fileContext, scope: scope,
@@ -651,7 +703,7 @@ func runAskInteractiveWithRisk(baseDir string, opts agent.AskOptions, confirmToo
 		}
 		_, turnHistory := runAskOnceWithSession(askSessionParams{
 			baseDir: baseDir, prompt: prompt, opts: sessionOpts,
-			confirmTools: confirmTools, riskPolicy: riskPolicy,
+			confirmTools: confirmTools, riskPolicy: riskPolicy, responseMode: responseMode,
 			previousPrompts: previousPrompts, sessionHistory: sessionHistory,
 			catalog: catalog, toolsCatalog: toolsCatalog,
 			fileContext: fileContext, scope: scope,

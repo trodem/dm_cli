@@ -79,6 +79,7 @@ func addCobraSubcommands(root *cobra.Command) {
 	var askConfirmTools bool
 	var askNoConfirmTools bool
 	var askRiskPolicy string
+	var askResponseMode string
 	var askJSON bool
 	var askFiles []string
 	var askScope string
@@ -102,6 +103,10 @@ func addCobraSubcommands(root *cobra.Command) {
 			if riskErr != nil {
 				return riskErr
 			}
+			responseMode, modeErr := normalizeResponseMode(askResponseMode)
+			if modeErr != nil {
+				return modeErr
+			}
 			rt, err := loadRuntime()
 			if err != nil {
 				return err
@@ -120,7 +125,7 @@ func addCobraSubcommands(root *cobra.Command) {
 				}
 				code, _ := runAskOnceWithSession(askSessionParams{
 					baseDir: rt.BaseDir, prompt: strings.Join(args, " "), opts: askOpts,
-					confirmTools: confirmTools, riskPolicy: riskPolicy, jsonOut: true,
+					confirmTools: confirmTools, riskPolicy: riskPolicy, responseMode: responseMode, jsonOut: true,
 					fileContext: fileCtx, scope: askScope,
 				})
 				if code != 0 {
@@ -132,7 +137,7 @@ func addCobraSubcommands(root *cobra.Command) {
 			if len(args) > 0 {
 				initialPrompt = strings.Join(args, " ")
 			}
-			code := runAskInteractiveWithRisk(rt.BaseDir, askOpts, confirmTools, riskPolicy, initialPrompt, fileCtx, askScope)
+			code := runAskInteractiveWithRisk(rt.BaseDir, askOpts, confirmTools, riskPolicy, responseMode, initialPrompt, fileCtx, askScope)
 			if code != 0 {
 				return exitCodeError{code: code}
 			}
@@ -146,6 +151,7 @@ func addCobraSubcommands(root *cobra.Command) {
 	askCmd.Flags().BoolVar(&askNoConfirmTools, "no-confirm-tools", false, "disable confirmation before agent actions")
 	askCmd.MarkFlagsMutuallyExclusive("confirm-tools", "no-confirm-tools")
 	askCmd.Flags().StringVar(&askRiskPolicy, "risk-policy", riskPolicyNormal, "risk policy: strict|normal|off")
+	askCmd.Flags().StringVar(&askResponseMode, "response-mode", responseModeRawFirst, "response mode: raw-first|llm-first")
 	askCmd.Flags().BoolVar(&askJSON, "json", false, "print structured JSON output (non-interactive only)")
 	askCmd.Flags().StringArrayVarP(&askFiles, "file", "f", nil, "attach file as context (repeatable)")
 	askCmd.Flags().StringVarP(&askScope, "scope", "s", "", "limit plugin catalog to a toolkit prefix or domain (e.g. stibs, m365, docker)")
