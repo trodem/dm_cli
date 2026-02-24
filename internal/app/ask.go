@@ -16,7 +16,6 @@ import (
 )
 
 const askMaxSteps = 4
-const askDecisionCacheTTL = 3 * time.Minute
 const askHistoryMaxLen = 2000
 const askPreviousPromptsMax = 6
 const askDescMaxLen = 80
@@ -127,7 +126,7 @@ func runAskOnceWithSession(p askSessionParams) (int, []askActionRecord) {
 		}
 
 		t0 := time.Now()
-		decision, _, err := decideWithCache(decisionPrompt, catalog, toolsCatalog, p.opts, envContext)
+		decision, err := agent.DecideWithPlugins(decisionPrompt, catalog, toolsCatalog, p.opts, envContext)
 		spinner.Stop()
 
 		slog.Debug("agent decision received",

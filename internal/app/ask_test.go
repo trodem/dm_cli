@@ -4,7 +4,6 @@ import (
 	"os"
 	"strings"
 	"testing"
-	"time"
 
 	"cli/internal/agent"
 )
@@ -123,40 +122,6 @@ func TestPlannedActionSummaryTool(t *testing.T) {
 	}
 	if !strings.Contains(got, "name=report") || !strings.Contains(got, "ext=pdf") {
 		t.Fatalf("expected tool args in summary, got %q", got)
-	}
-}
-
-func TestDecisionCacheKeyStableWithTrim(t *testing.T) {
-	opts := agent.AskOptions{
-		Provider: " OpenAI ",
-		Model:    "gpt-4o-mini",
-		BaseURL:  " https://api.openai.com/v1 ",
-	}
-	k1 := decisionCacheKey("  test  ", "  pcat  ", "  tcat  ", opts, "  ctx  ")
-	k2 := decisionCacheKey("test", "pcat", "tcat", agent.AskOptions{
-		Provider: "openai",
-		Model:    "gpt-4o-mini",
-		BaseURL:  "https://api.openai.com/v1",
-	}, "ctx")
-	if k1 != k2 {
-		t.Fatalf("expected equal cache keys, got %q != %q", k1, k2)
-	}
-}
-
-func TestDecisionCacheStoreTTL(t *testing.T) {
-	cache := newDecisionCacheStore(50 * time.Millisecond)
-	key := "k"
-	value := agent.DecisionResult{Action: "answer", Answer: "ok"}
-	start := time.Now()
-	cache.Set(key, value, start)
-
-	got, ok := cache.Get(key, start.Add(10*time.Millisecond))
-	if !ok || got.Answer != "ok" {
-		t.Fatalf("expected cached value before ttl, got ok=%v value=%+v", ok, got)
-	}
-
-	if _, ok := cache.Get(key, start.Add(100*time.Millisecond)); ok {
-		t.Fatal("expected cache miss after ttl expiration")
 	}
 }
 
