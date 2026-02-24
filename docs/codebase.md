@@ -36,11 +36,10 @@ dm_cli/
 │   ├── agent/               # LLM decision engine (2 src + 2 test)
 │   │   ├── agent.go         #   AskWithOptions, DecideWithPlugins, JSON repair
 │   │   └── toolkit_builder.go #   BuildFunction (create_function action)
-│   ├── app/                 # Cobra commands, ask loop, output (16 src + 5 test)
+│   ├── app/                 # Cobra commands, ask loop, output (15 src + 5 test)
 │   │   ├── cobra.go         #   Root Cobra command, app.Run()
 │   │   ├── cmd_core.go      #   Subcommand registration (ask, doctor, plugins, tools...)
 │   │   ├── ask.go           #   Multi-step agent loop (runAskOnceWithSession)
-│   │   ├── ask_cache.go     #   Decision cache (3 min TTL)
 │   │   ├── ask_catalog.go   #   Plugin/tool catalog builder for LLM prompt
 │   │   ├── ask_output.go    #   TTY + JSON output writers
 │   │   ├── ask_risk.go      #   Risk assessment (low/medium/high)
@@ -95,7 +94,7 @@ dm_cli/
 └── .github/workflows/ci.yml # GitHub Actions CI pipeline
 ```
 
-**File counts:** 41 Go source + 19 test/bench = 60 `.go` files total.
+**File counts:** 40 Go source + 19 test/bench = 59 `.go` files total.
 
 ---
 
@@ -111,9 +110,7 @@ flowchart TD
     AskCmd -->|one-shot or REPL| AskLoop["ask.go: runAskOnceWithSession"]
 
     AskLoop --> BuildPrompt["buildAskPlannerPrompt\n(user request + history)"]
-    BuildPrompt --> Cache{"ask_cache.go:\ndecideWithCache"}
-    Cache -->|cache hit| Dispatch
-    Cache -->|cache miss| LLM
+    BuildPrompt --> LLM
 
     LLM["agent.go: DecideWithPlugins"]
     LLM --> SysPrompt["buildDecisionSystemPrompt\n(plugin catalog + tool catalog)"]
@@ -157,7 +154,7 @@ flowchart TD
 | System prompt | Plugin catalog + tool catalog + 7-step reasoning | Decision guidance |
 | User prompt | User request + action history + env context | Task context |
 | Max steps | 4 | Loop limit per turn |
-| Cache TTL | 3 min | Avoid duplicate LLM calls |
+| Response mode | `raw-first` (default), `llm-first` | Controls whether successful tool/plugin runs print only raw output or also LLM commentary |
 | Token budget | 6000 (catalog) / 20000 (prompt) | Size warnings |
 
 ### Plugin execution path
@@ -187,7 +184,7 @@ flowchart TD
 | Command | Handler | Description |
 |---------|---------|-------------|
 | `dm` (no args) | `cobra.go: rootCmd` | Splash screen (version, build time) |
-| `dm ask <prompt>` | `cmd_core.go: askCmd` | AI agent (REPL or one-shot). Flags: `--provider`, `--model`, `--base-url`, `--scope`, `--json`, `-f`, `--risk-policy` |
+| `dm ask <prompt>` | `cmd_core.go: askCmd` | AI agent (REPL or one-shot). Flags: `--provider`, `--model`, `--base-url`, `--scope`, `--json`, `-f`, `--risk-policy`, `--response-mode` |
 | `dm doctor` | `cmd_core.go: doctorCmd` | Diagnostics (config, provider, plugins, paths) |
 | `dm plugins [list\|info\|run\|menu]` | `cmd_core.go` | Plugin management and execution |
 | `dm tools [name]` | `cmd_core.go` | Built-in tools (search, rename, recent, clean, system, read, grep, diff) |
